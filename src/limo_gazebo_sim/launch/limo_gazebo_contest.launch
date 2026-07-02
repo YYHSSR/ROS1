@@ -41,11 +41,14 @@
 
     <node name="rviz" pkg="rviz" type="rviz" args="-d $(find limo_gazebo_sim)/rviz/robot.rviz" />
 
+    <!-- 是否加载已保存的地图，默认不加载（建图阶段设为 false，建图完成后导航或避障时设为 true） -->
+    <arg name="load_map" default="true" />
+
     <!-- 启动地图服务器，加载保存的地图 -->
-    <node name="map_server" pkg="map_server" type="map_server" args="$(env HOME)/map.yaml" output="screen">
+    <node name="map_server" pkg="map_server" type="map_server" args="$(find limo_visions)/map/map.yaml" output="screen" if="$(arg load_map)">
         <param name="frame_id" value="map" />
     </node>
 
     <!-- 发布 map 到 odom 的静态坐标变换以连接坐标系树 -->
-    <node pkg="tf" type="static_transform_publisher" name="map_to_odom" args="0.0 0.0 0.0 0.0 0.0 0.0 map odom 10" />
+    <node pkg="tf" type="static_transform_publisher" name="map_to_odom" args="0.0 0.0 0.0 0.0 0.0 0.0 map odom 10" if="$(arg load_map)" />
 </launch>

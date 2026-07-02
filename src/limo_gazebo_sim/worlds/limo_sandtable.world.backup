@@ -1,0 +1,144 @@
+<?xml version="1.0" ?>
+<sdf version="1.5">
+  <world name="limo_sandtable_world">
+    <!-- A global light source -->
+    <include>
+      <uri>model://sun</uri>
+    </include>
+    <!-- A ground plane -->
+    <include>
+      <uri>model://ground_plane</uri>
+    </include>
+
+    <!-- Physics settings -->
+    <physics type='ode'>
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+      <gravity>0 0 -9.8</gravity>
+    </physics>
+
+    <!-- Sandtable Textured Ground (Visual Only, scaled to 7.5m) -->
+    <model name='sandtable_ground'>
+      <static>true</static>
+      <link name='link'>
+        <pose>0 0 0.0005 0 0 0</pose>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>7.5 7.5 0.001</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file:///home/zf/catkin_ws/src/limo_gazebo_sim/materials/scripts</uri>
+              <uri>file:///home/zf/catkin_ws/src/limo_gazebo_sim/materials/textures</uri>
+              <name>LimoMap</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- White Enclosure Walls (With Collision, scaled 2.5x) -->
+    <model name='enclosure_walls'>
+      <static>true</static>
+      <!-- North Wall -->
+      <link name='wall_north'>
+        <pose>3.75 0 0.375 0 0 0</pose>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.02 7.5 0.75</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.02 7.5 0.75</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <name>Gazebo/White</name>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+            </script>
+          </material>
+        </visual>
+      </link>
+      <!-- South Wall -->
+      <link name='wall_south'>
+        <pose>-3.75 0 0.375 0 0 0</pose>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.02 7.5 0.75</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.02 7.5 0.75</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <name>Gazebo/White</name>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+            </script>
+          </material>
+        </visual>
+      </link>
+      <!-- East Wall -->
+      <link name='wall_east'>
+        <pose>0 3.75 0.375 0 0 0</pose>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>7.5 0.02 0.75</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>7.5 0.02 0.75</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <name>Gazebo/White</name>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+            </script>
+          </material>
+        </visual>
+      </link>
+      <!-- West Wall -->
+      <link name='wall_west'>
+        <pose>0 -3.75 0.375 0 0 0</pose>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>7.5 0.02 0.75</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>7.5 0.02 0.75</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <name>Gazebo/White</name>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+  </world>
+</sdf>
