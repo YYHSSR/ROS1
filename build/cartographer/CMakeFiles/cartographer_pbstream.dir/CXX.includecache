@@ -1,0 +1,26 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/zf/catkin_ws/src/cartographer/cartographer/io/internal/pbstream_info.h
+
+/home/zf/catkin_ws/src/cartographer/cartographer/io/internal/pbstream_migrate.h
+
+/home/zf/catkin_ws/src/cartographer/cartographer/io/pbstream_main.cc
+functional
+-
+absl/container/flat_hash_set.h
+/home/zf/catkin_ws/src/cartographer/cartographer/io/absl/container/flat_hash_set.h
+cartographer/io/internal/pbstream_info.h
+/home/zf/catkin_ws/src/cartographer/cartographer/io/cartographer/io/internal/pbstream_info.h
+cartographer/io/internal/pbstream_migrate.h
+/home/zf/catkin_ws/src/cartographer/cartographer/io/cartographer/io/internal/pbstream_migrate.h
+gflags/gflags.h
+/home/zf/catkin_ws/src/cartographer/cartographer/io/gflags/gflags.h
+glog/logging.h
+/home/zf/catkin_ws/src/cartographer/cartographer/io/glog/logging.h
+

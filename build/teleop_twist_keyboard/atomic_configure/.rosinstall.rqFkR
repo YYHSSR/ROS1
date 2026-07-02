@@ -1,0 +1,2 @@
+- setup-file:
+    local-name: /home/zf/catkin_ws/devel/.private/teleop_twist_keyboard/setup.sh

@@ -1,0 +1,8 @@
+prefix=/home/zf/catkin_ws/devel/.private/message
+
+Name: message
+Description: Description of message
+Version: 0.0.0
+Cflags: -I/home/zf/catkin_ws/devel/.private/message/include
+Libs: -L${prefix}/lib 
+Requires: roscpp rospy std_msgs message_runtime

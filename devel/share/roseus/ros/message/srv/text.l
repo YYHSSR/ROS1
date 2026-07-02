@@ -1,0 +1,1 @@
+/home/zf/catkin_ws/devel/.private/message/share/roseus/ros/message/srv/text.l

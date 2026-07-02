@@ -1,0 +1,1 @@
+/home/zf/catkin_ws/devel/.private/message/lib/python3/dist-packages/message/msg/_content.py

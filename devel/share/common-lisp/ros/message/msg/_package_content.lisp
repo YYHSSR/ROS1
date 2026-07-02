@@ -1,0 +1,1 @@
+/home/zf/catkin_ws/devel/.private/message/share/common-lisp/ros/message/msg/_package_content.lisp

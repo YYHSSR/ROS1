@@ -1,0 +1,8 @@
+prefix=/home/zf/catkin_ws/devel/.private/limo_visions
+
+Name: limo_visions
+Description: Description of limo_visions
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

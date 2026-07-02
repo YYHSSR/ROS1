@@ -1,0 +1,27 @@
+Not searching for unused variables given on the command line.
+[36m--[0m Build type: Release
+[33m[1mCMake Warning[0m at /usr/src/googletest/googlemock/CMakeLists.txt:43 (project):
+  VERSION keyword not followed by a value or was followed by a value that
+  expanded to nothing.
+
+
+[33m[1mCMake Warning[0m at /usr/src/googletest/googletest/CMakeLists.txt:54 (project):
+  VERSION keyword not followed by a value or was followed by a value that
+  expanded to nothing.
+
+
+[36m--[0m Found installed version of Eigen: /usr/lib/cmake/eigen3
+[36m--[0m Found required Ceres dependency: Eigen version 3.3.7 in /usr/include/eigen3
+[36m--[0m Found required Ceres dependency: glog
+[36m--[0m Found installed version of gflags: /usr/lib/x86_64-linux-gnu/cmake/gflags
+[36m--[0m Detected gflags version: 2.2.2
+[36m--[0m Found required Ceres dependency: gflags
+[36m--[0m Found Ceres version: 1.14.0 installed in: /usr with components: [EigenSparse, SparseLinearAlgebraLibrary, LAPACK, SuiteSparse, CXSparse, SchurSpecializations, OpenMP, Multithreading]
+[36m--[0m Found Lua: /usr/lib/x86_64-linux-gnu/liblua5.2.so;/usr/lib/x86_64-linux-gnu/libm.so (found version "5.2.4")
+[36m--[0m Found Protobuf: /usr/lib/x86_64-linux-gnu/libprotobuf.so;-lpthread (found suitable version "3.6.1", minimum required is "3.0.0")
+[36m--[0m Found PkgConfig: /usr/bin/pkg-config (found version "0.29.1")
+[36m--[0m Checking for one of the modules 'cairo>=1.12.16'
+[36m--[0m Found Sphinx: /usr/bin/sphinx-build
+[36m--[0m Configuring done
+[36m--[0m Generating done
+[36m--[0m Build files have been written to: /home/zf/catkin_ws/build/cartographer

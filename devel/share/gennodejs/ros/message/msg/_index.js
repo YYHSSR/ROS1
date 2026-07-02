@@ -1,0 +1,1 @@
+/home/zf/catkin_ws/devel/.private/message/share/gennodejs/ros/message/msg/_index.js

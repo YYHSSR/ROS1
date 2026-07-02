@@ -1,0 +1,1 @@
+/home/zf/catkin_ws/devel/.private/message/share/message/cmake/messageConfig-version.cmake

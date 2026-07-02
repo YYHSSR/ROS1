@@ -1,0 +1,2 @@
+- setup-file:
+    local-name: /home/zf/catkin_ws/devel/.private/limo_visions/setup.sh
