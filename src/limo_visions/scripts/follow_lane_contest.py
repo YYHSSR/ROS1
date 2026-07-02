@@ -211,7 +211,7 @@ class follow_lane:
             return
         # 第二阶段：在 out == -1 时正常巡线
         if out == -1 and 5.55 <= front_dist <= 5.6:
-            self.run_time(0.18, 0.63, 6.8)
+            self.run_time(0.19, 0.63, 6.8)
             self.run_time(0.15, 0, 1)
             self.run_time(0, 0, 99999)
             return

@@ -1,0 +1,21 @@
+<launch>
+  <!-- 启动 Cartographer 建图节点 -->
+  <node name="cartographer_node" pkg="cartographer_ros"
+      type="cartographer_node" args="
+          -configuration_directory $(find limo_visions)/config
+          -configuration_basename limo_cartographer.lua"
+      output="screen">
+    <!-- 重映射输入话题以匹配 LIMO 小车仿真发布的话题 -->
+    <remap from="scan" to="/limo/scan" />
+    <remap from="odom" to="/odom" />
+  </node>
+
+  <!-- 启动 submap 转 occupancy grid map 节点（生成导航和 RViz 展现所需的 /map 栅格地图话题） -->
+  <node name="cartographer_occupancy_grid_node" pkg="cartographer_ros"
+      type="cartographer_occupancy_grid_node" args="-resolution 0.05" />
+
+  <!-- 启动键盘控制节点（自动在一个独立的新终端窗口中弹出，以正常捕获按键） -->
+  <node name="teleop_keybord" pkg="teleop_twist_keyboard" type="teleop_twist_keyboard.py" output="screen" launch-prefix="gnome-terminal --">
+    <param name="repeat_rate" value="50.0" />
+  </node>
+</launch>
