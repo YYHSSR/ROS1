@@ -1,9 +1,0 @@
-<launch>
-
-    <include file="$(find limo_bringup)/launch/limo_start.launch" />
-    <include file="$(find astra_camera)/launch/dabai_u3.launch" />
-    <include file="$(find limo_bringup)/launch/limo_rtabmap_orbbec.launch" />
-    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find limo_bringup)/rviz/rtab_slam.rviz"/>
-
-</launch>
-

@@ -362,8 +362,13 @@ void GazeboRosAckermanDrive::GetWheelVelocities() {
     double r;
     int sig = 1;
 
-    r = fabs(vr / va);
-    steer_cmd = std::atan(wheelbase_ / r);
+    if (fabs(va) < 1e-6) {
+        r = 1e9;
+        steer_cmd = 0.0;
+    } else {
+        r = fabs(vr / va);
+        steer_cmd = std::atan(wheelbase_ / r);
+    }
     steer_cmd = va < 0 ? -1 * steer_cmd : steer_cmd;
     if (steer_cmd > max_steer_angle_central) {
         steer_cmd = max_steer_angle_central;
@@ -374,8 +379,10 @@ void GazeboRosAckermanDrive::GetWheelVelocities() {
     sig = steer_cmd < 0 ? -1 : 1;
     ConvertCentralAngleToLeftRight(steer_cmd, r,last_motor_cmd[1].data, last_motor_cmd[0].data);
     if (fabs(steer_cmd) > 0){
-        left_side_velocity = vr - sig * vr / r * track_ * 0.2;
-        right_side_velocity = vr + sig * vr / r * track_ * 0.2;
+        double sign_vr = vr < 0 ? -1.0 : 1.0;
+        double scale_term = va * sign_vr;
+        left_side_velocity = vr - scale_term * track_ * 0.2;
+        right_side_velocity = vr + scale_term * track_ * 0.2;
     }
     if(vr != 0.0) {
         wheel_speed_[RIGHT_FRONT] = right_side_velocity / fabs(std::cos(last_motor_cmd[0].data));

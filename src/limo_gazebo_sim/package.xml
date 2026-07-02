@@ -19,6 +19,5 @@
   <run_depend>gazebo_ros_control</run_depend>
   <run_depend>gazebo_dev</run_depend>
   <run_depend>gazebo_msgs</run_depend>    
-  <run_depend>limo_description</run_depend>
   <run_depend>rostopic</run_depend>
 </package>

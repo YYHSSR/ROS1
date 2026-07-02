@@ -12,7 +12,7 @@
         <arg name="verbose" value="true"/>
     </include>
 
-    <param name="robot_description" command="$(find xacro)/xacro '$(find limo_description)/urdf/limo_four_diff.xacro' robot_namespace:=$(arg robot_namespace)" />
+    <param name="robot_description" command="$(find xacro)/xacro '$(find limo_gazebo_sim)/urdf/limo_four_diff.xacro' robot_namespace:=$(arg robot_namespace)" />
 
     <!-- initial pose -->
     <arg name="x" default="0.0"/>
@@ -40,5 +40,5 @@
     <node pkg="tf" type="static_transform_publisher" name="base_link_to_imu_link" args="0.0 0.0 0.0 0.0 0.0 0.0 /base_link /imu_link 10" />
 
 
-    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find limo_description)/rviz/robot.rviz" />
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find limo_gazebo_sim)/rviz/robot.rviz" />
 </launch>
