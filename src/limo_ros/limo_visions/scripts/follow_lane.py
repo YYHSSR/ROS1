@@ -75,7 +75,7 @@ class follow_lane:
                     ang_vel = 0.0
             else:
                 # 正常检测到黄色线，进行比例控制以保持在车道中间（目标列为 60）
-                target_x = 140
+                target_x = 135
                 lin_vel = 0.19
                 error = target_x - x
                 ang_vel = error * 0.007

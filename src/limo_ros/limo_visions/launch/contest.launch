@@ -3,5 +3,5 @@
     <node name="detect_lane" pkg="limo_visions" type="detect_lane_contest.py" output="screen" />
 
     <!-- Launch the lane following node -->
-    <node name="follow_lane" pkg="limo_visions" type="follow_lane_contest_odom.py" output="screen" />
+    <node name="follow_lane" pkg="limo_visions" type="follow_lane_contest.py" output="screen" />
 </launch>
