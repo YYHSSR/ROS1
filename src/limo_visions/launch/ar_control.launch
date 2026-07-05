@@ -1,0 +1,4 @@
+<launch>
+    <include file="$(find limo_visions)/launch/ar_code.launch" />
+    <node name="move_to_target_ar" pkg="limo_visions" type="move_to_target_ar.py" output="screen" />
+</launch>

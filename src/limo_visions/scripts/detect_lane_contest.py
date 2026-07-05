@@ -21,7 +21,8 @@ class lane_converter:
         self.red_image_pub = rospy.Publisher("/red_detect_image", Image, queue_size=1)
         # 2. 声明工具类与订阅者 (Tools & Subscribers)
         self.bridge = CvBridge()
-        self.image_sub = rospy.Subscriber("/limo/color/image_raw", Image, self.callback)
+        # self.image_sub = rospy.Subscriber("/limo/color/image_raw", Image, self.callback)
+        self.image_sub = rospy.Subscriber("/camera/rgb/image_raw", Image, self.callback)
 
     def detect_yellow_lane(self, hsv, kernel):
         # 识别黄色车道线，返回车道线的横向、纵向中心坐标，总像素面积，以及二值化Mask

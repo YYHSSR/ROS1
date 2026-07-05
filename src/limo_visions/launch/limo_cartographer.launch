@@ -5,9 +5,6 @@
           -configuration_directory $(find limo_visions)/config
           -configuration_basename limo_cartographer.lua"
       output="screen">
-    <!-- 重映射输入话题以匹配 LIMO 小车仿真发布的话题 -->
-    <remap from="scan" to="/limo/scan" />
-    <remap from="odom" to="/odom" />
   </node>
 
   <!-- 启动 submap 转 occupancy grid map 节点（生成导航和 RViz 展现所需的 /map 栅格地图话题） -->

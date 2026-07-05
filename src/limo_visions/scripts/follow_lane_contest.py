@@ -28,7 +28,8 @@ class follow_lane:
         #订阅道路线位置
         self.Pose_sub = rospy.Subscriber("/lane_detect_pose", Pose, self.velctory)
         #订阅雷达数据
-        self.Scan_sub = rospy.Subscriber("/limo/scan", LaserScan, self.scan,queue_size=5)
+        # self.Scan_sub = rospy.Subscriber("/limo/scan", LaserScan, self.scan,queue_size=5)
+        self.Scan_sub = rospy.Subscriber("/scan", LaserScan, self.scan,queue_size=5)
         #订阅里程计坐标 /odom
         self.odom_sub = rospy.Subscriber("/odom", Odometry, self.odom_callback, queue_size=3)
         #订阅红点位置

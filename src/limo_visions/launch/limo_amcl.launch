@@ -7,16 +7,15 @@
     </node>
 
     <node pkg="amcl" type="amcl" name="amcl" output="screen">
-        <!--<rosparam file="$(find limo_bringup)/param/amcl_params_diff.yaml" command="load" />-->
-        <rosparam file="$(find limo_bringup)/param/amcl_params_omni.yaml" command="load" />
+        <rosparam file="$(find limo_visions)/param/amcl_params_diff.yaml" command="load" />
         <param name="initial_pose_x" value="0"/>
         <param name="initial_pose_y" value="0"/>
         <param name="initial_pose_a" value="0"/>
     </node>
 
-    <node pkg="map_server" type="map_server" name="map_server" args="$(find limo_bringup)/maps/map1.yaml" output="screen" >
+    <node pkg="map_server" type="map_server" name="map_server" args="$(find limo_visions)/maps/map1.yaml" output="screen" >
     <param name="frame_id" value="map"/>
     </node>
 
-    <node pkg="rviz"  type="rviz"  name="rviz"  args="-d $(find limo_bringup)/rviz/amcl.rviz" />
+    <node pkg="rviz"  type="rviz"  name="rviz"  args="-d $(find limo_visions)/rviz/contest.rviz" />
 </launch>
