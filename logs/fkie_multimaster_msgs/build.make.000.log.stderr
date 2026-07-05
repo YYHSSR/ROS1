@@ -1,0 +1,16 @@
+/usr/bin/python3: Error while finding module specification for 'grpc_tools.protoc' (ModuleNotFoundError: No module named 'grpc_tools')
+/usr/bin/python3: Error while finding module specification for 'grpc_tools.protoc' (ModuleNotFoundError: No module named 'grpc_tools')
+make[2]: *** [CMakeFiles/fkie_multimaster_msgs_GRPC.dir/build.make:74：/home/zf/catkin_ws/devel/.private/fkie_multimaster_msgs/lib/python3/dist-packages/fkie_multimaster_msgs/grpc/file_pb2.py] 错误 1
+make[2]: *** 正在等待未完成的任务....
+make[2]: *** [CMakeFiles/fkie_multimaster_msgs_GRPC.dir/build.make:129：/home/zf/catkin_ws/devel/.private/fkie_multimaster_msgs/lib/python3/dist-packages/fkie_multimaster_msgs/grpc/version_pb2.py] 错误 1
+/usr/bin/python3: Error while finding module specification for 'grpc_tools.protoc' (ModuleNotFoundError: No module named 'grpc_tools')
+make[2]: *** [CMakeFiles/fkie_multimaster_msgs_GRPC.dir/build.make:85：/home/zf/catkin_ws/devel/.private/fkie_multimaster_msgs/lib/python3/dist-packages/fkie_multimaster_msgs/grpc/launch_pb2.py] 错误 1
+/usr/bin/python3: Error while finding module specification for 'grpc_tools.protoc' (ModuleNotFoundError: No module named 'grpc_tools')
+/usr/bin/python3: Error while finding module specification for 'grpc_tools.protoc' (ModuleNotFoundError: No module named 'grpc_tools')
+/usr/bin/python3: Error while finding module specification for 'grpc_tools.protoc' (ModuleNotFoundError: No module named 'grpc_tools')
+make[2]: *** [CMakeFiles/fkie_multimaster_msgs_GRPC.dir/build.make:96：/home/zf/catkin_ws/devel/.private/fkie_multimaster_msgs/lib/python3/dist-packages/fkie_multimaster_msgs/grpc/monitor_pb2.py] 错误 1
+make[2]: *** [CMakeFiles/fkie_multimaster_msgs_GRPC.dir/build.make:118：/home/zf/catkin_ws/devel/.private/fkie_multimaster_msgs/lib/python3/dist-packages/fkie_multimaster_msgs/grpc/settings_pb2.py] 错误 1
+make[2]: *** [CMakeFiles/fkie_multimaster_msgs_GRPC.dir/build.make:107：/home/zf/catkin_ws/devel/.private/fkie_multimaster_msgs/lib/python3/dist-packages/fkie_multimaster_msgs/grpc/screen_pb2.py] 错误 1
+make[1]: *** [CMakeFiles/Makefile2:169：CMakeFiles/fkie_multimaster_msgs_GRPC.dir/all] 错误 2
+make[1]: *** 正在等待未完成的任务....
+make: *** [Makefile:141：all] 错误 2

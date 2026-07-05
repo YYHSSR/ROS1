@@ -1,0 +1,21 @@
+<launch>
+    <!-- 启动 FKIE Master Discovery 节点 -->
+    <node pkg="master_discovery_fkie" type="master_discovery" name="master_discovery" output="screen" />
+
+    <!-- 启动 FKIE Master Sync 节点 -->
+    <node pkg="master_sync_fkie" type="master_sync" name="master_sync" output="screen">
+        <!-- 同步白名单：需要同步相机的图像数据、相机内参数据，以及回传的控制速度话题 -->
+        <rosparam param="sync_topics">
+            - /camera/rgb/image_raw
+            - /camera/rgb/camera_info
+            - /cmd_vel
+            - /tf
+            - /tf_static
+        </rosparam>
+        <!-- 忽略不需要同步的其他话题 -->
+        <rosparam param="ignore_topics">
+            - /rosout
+            - /rosout_agg
+        </rosparam>
+    </node>
+</launch>

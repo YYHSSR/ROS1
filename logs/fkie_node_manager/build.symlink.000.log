@@ -1,0 +1,12 @@
+Symlinking /home/zf/catkin_ws/devel/share/fkie_node_manager/DATE
+Symlinking /home/zf/catkin_ws/devel/share/fkie_node_manager/node_manager.desktop
+Symlinking /home/zf/catkin_ws/devel/share/fkie_node_manager/VERSION
+Symlinking /home/zf/catkin_ws/devel/share/fkie_node_manager/cmake/fkie_node_managerConfig.cmake
+Symlinking /home/zf/catkin_ws/devel/share/fkie_node_manager/cmake/fkie_node_managerConfig-version.cmake
+Symlinking /home/zf/catkin_ws/devel/lib/python3/dist-packages/fkie_node_manager/__init__.py
+Symlinking /home/zf/catkin_ws/devel/lib/pkgconfig/fkie_node_manager.pc
+Symlinking /home/zf/catkin_ws/devel/lib/fkie_node_manager/script_runner.py
+Symlinking /home/zf/catkin_ws/devel/lib/fkie_node_manager/dynamic_reconfigure
+Symlinking /home/zf/catkin_ws/devel/lib/fkie_node_manager/remote_nm.py
+Symlinking /home/zf/catkin_ws/devel/lib/fkie_node_manager/node_manager
+Symlinking /home/zf/catkin_ws/devel/bin/node_manager

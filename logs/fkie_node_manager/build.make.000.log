@@ -1,0 +1,5 @@
+Scanning dependencies of target fkie_node_manager_GET_VERSION
+[ 33%] create date file /home/zf/catkin_ws/devel/.private/fkie_node_manager/share/fkie_node_manager/DATE
+[ 66%] create version file /home/zf/catkin_ws/devel/.private/fkie_node_manager/share/fkie_node_manager/VERSION
+[100%] Generate version files
+[100%] Built target fkie_node_manager_GET_VERSION
