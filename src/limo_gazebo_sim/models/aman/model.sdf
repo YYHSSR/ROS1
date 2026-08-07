@@ -3,12 +3,12 @@
   <model name="aman">
     <static>true</static>
     <link name="link">
-      <pose>0 0 0 1.570796 0 0</pose>
       <visual name="visual">
+        <pose>-0.097875 0.097875 0.002 1.570796 0 0</pose>
         <geometry>
           <mesh>
             <uri>file:///home/zf/catkin_ws/src/limo_gazebo_sim/meshes/man.STL</uri>
-            <scale>0.0015 0.0015 0.0015</scale>
+            <scale>0.00135 0.00135 0.00135</scale>
           </mesh>
         </geometry>
         <material>
@@ -22,10 +22,11 @@
         </material>
       </visual>
       <collision name="collision">
+        <pose>-0.097875 0.097875 0.002 1.570796 0 0</pose>
         <geometry>
           <mesh>
             <uri>file:///home/zf/catkin_ws/src/limo_gazebo_sim/meshes/man.STL</uri>
-            <scale>0.0015 0.0015 0.0015</scale>
+            <scale>0.00135 0.00135 0.00135</scale>
           </mesh>
         </geometry>
       </collision>
