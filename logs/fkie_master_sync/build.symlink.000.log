@@ -1,6 +1,0 @@
-Symlinking /home/zf/catkin_ws/devel/share/fkie_master_sync/cmake/fkie_master_syncConfig.cmake
-Symlinking /home/zf/catkin_ws/devel/share/fkie_master_sync/cmake/fkie_master_syncConfig-version.cmake
-Symlinking /home/zf/catkin_ws/devel/lib/python3/dist-packages/fkie_master_sync/__init__.py
-Symlinking /home/zf/catkin_ws/devel/lib/pkgconfig/fkie_master_sync.pc
-Symlinking /home/zf/catkin_ws/devel/lib/fkie_master_sync/master_sync
-Symlinking /home/zf/catkin_ws/devel/lib/fkie_master_sync/param_sync.py

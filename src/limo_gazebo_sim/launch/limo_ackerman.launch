@@ -1,7 +1,13 @@
 <launch>
     <arg name="robot_namespace" default=""/>
-    <arg name="world_name" default="$(find limo_gazebo_sim)/worlds/empty.world"/>
+    <!-- 沙盒地图文件路径，如果需要沙盘地图可设为 $(find limo_gazebo_sim)/worlds/limo_sandtable.world -->
+    <arg name="world_name" default="$(find gazebo_ros)/worlds/empty.world"/>
 
+    <!-- 
+      说明: $(find gazebo_ros) 是 ROS 系统的宏查找命令。
+      它会自动定位到系统安装的 ROS 功能包目录（通常在 /opt/ros/noetic/share/gazebo_ros），
+      而不是在当前工作区 catkin_ws/src 中查找。
+    -->
     <include file="$(find gazebo_ros)/launch/empty_world.launch">
         <arg name="world_name" value="$(arg world_name)"/>
         <arg name="paused" value="false"/>
@@ -12,13 +18,16 @@
         <arg name="verbose" value="true"/>
     </include>
 
+    <!-- 加载阿克曼模型 URDF/Xacro 描述文件 -->
     <param name="robot_description" command="$(find xacro)/xacro '$(find limo_gazebo_sim)/urdf/limo_ackerman.xacro' robot_namespace:=$(arg robot_namespace)" />
 
-    <!-- initial pose -->
+    <!-- 初始位姿参数 -->
     <arg name="x" default="0.0"/>
     <arg name="y" default="0.0"/>
     <arg name="z" default="0.0"/>
     <arg name="yaw" default="0.0"/>
+
+    <!-- 在 Gazebo 中生成小车模型 -->
     <node name="spawn_limo_model" pkg="gazebo_ros" type="spawn_model" args="-x $(arg x)
               -y $(arg y)
               -z $(arg z)
@@ -28,16 +37,17 @@
               -param robot_description
               -model 'limo$(arg robot_namespace)'" />
 
-    <!-- Load joint controller configurations from YAML file to parameter server -->
+    <!-- 加载阿克曼转向关节控制器参数 -->
     <rosparam file="$(find limo_gazebo_sim)/config/limo_ackerman_control.yaml" command="load"/>
 
-    <!-- load the controllers -->
+    <!-- 启动控制器与机器人状态发布器 -->
     <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false" output="screen" args="limo_fl_steering_hinge_controller limo_fr_steering_hinge_controller"/>
     <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
 
+    <!-- 静态坐标变换发布 (TF) -->
     <node pkg="tf" type="static_transform_publisher" name="base_link_to_laser_link" args="0.210 0.0 0.16 0.0 0.0 0.0 base_link laser_link 10" />
     <node pkg="tf" type="static_transform_publisher" name="base_link_to_imu_link" args="0.0 0.0 0.0 0.0 0.0 0.0 base_link imu_link 10" />
 
-
+    <!-- 启动 RViz 可视化界面 -->
     <node name="rviz" pkg="rviz" type="rviz" args="-d $(find limo_gazebo_sim)/rviz/robot.rviz" />
 </launch>

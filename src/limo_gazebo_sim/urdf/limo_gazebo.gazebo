@@ -55,7 +55,7 @@
                 </noise>
               </ray>
               <plugin name="gazebo_ros_laser_sensor" filename="libgazebo_ros_laser.so">
-                <topicName>/limo/scan</topicName>
+                <topicName>/scan</topicName>
                 <frameName>laser_link</frameName>
               </plugin>
             </sensor>
@@ -89,11 +89,11 @@
                 will control the frame rate. -->
               <updateRate>0.0</updateRate>
               <cameraName>camera_ir</cameraName>
-              <imageTopicName>/limo/color/image_raw</imageTopicName>
-              <cameraInfoTopicName>/limo/color/camera_info</cameraInfoTopicName>
-              <depthImageTopicName>/limo/depth/image_raw</depthImageTopicName>
-              <depthImageCameraInfoTopicName>/limo/depth/camera_info</depthImageCameraInfoTopicName>
-              <pointCloudTopicName>/limo/depth/points</pointCloudTopicName>
+              <imageTopicName>/color/image_raw</imageTopicName>
+              <cameraInfoTopicName>/color/camera_info</cameraInfoTopicName>
+              <depthImageTopicName>/depth/image_raw</depthImageTopicName>
+              <depthImageCameraInfoTopicName>/depth/camera_info</depthImageCameraInfoTopicName>
+              <pointCloudTopicName>/depth/3Dpoints</pointCloudTopicName>
               <frameName>depth_link</frameName>
               <cameraname>depth_camera_link</cameraname>
               
@@ -123,7 +123,7 @@
           <visualize>true</visualize>
           <topic>__default_topic__</topic>
           <plugin filename="libgazebo_ros_imu_sensor.so" name="imu_plugin">
-            <topicName>/limo/imu</topicName>
+            <topicName>/imu</topicName>
             <bodyName>${frame_prefix}_link</bodyName>
             <updateRateHZ>100.0</updateRateHZ>
             <gaussianNoise>0.001</gaussianNoise>
