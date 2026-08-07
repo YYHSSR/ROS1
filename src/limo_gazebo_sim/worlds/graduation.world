@@ -1,0 +1,56 @@
+<?xml version="1.0" ?>
+<sdf version="1.5">
+  <world name="graduation_world">
+    <!-- 全局光源 -->
+    <include>
+      <uri>model://sun</uri>
+    </include>
+
+    <!-- 地平地面 -->
+    <include>
+      <uri>model://ground_plane</uri>
+    </include>
+
+    <!-- 物理引擎配置 -->
+    <physics type='ode'>
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+      <gravity>0 0 -9.8</gravity>
+    </physics>
+
+    <!-- 加载 SolidWorks 导出的 ROS1.STL 毕设场景模型 (位于 meshes/ 目录下，坐标对齐在 Gazebo 原点 (0,0)) -->
+    <model name="graduation_scene">
+      <static>true</static>
+      <!-- 姿态配置: [x y z roll pitch yaw] -->
+      <pose>-5.02 5.08 0 1.570796 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <mesh>
+              <uri>file:///home/zf/catkin_ws/src/limo_gazebo_sim/meshes/ROS1.STL</uri>
+              <scale>2 2 2</scale>
+            </mesh>
+          </geometry>
+          <material>
+            <ambient>0.7 0.7 0.7 1</ambient>
+            <diffuse>0.7 0.7 0.7 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Grey</name>
+            </script>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <mesh>
+              <uri>file:///home/zf/catkin_ws/src/limo_gazebo_sim/meshes/ROS1.STL</uri>
+              <scale>2 2 2</scale>
+            </mesh>
+          </geometry>
+        </collision>
+      </link>
+    </model>
+  </world>
+</sdf>

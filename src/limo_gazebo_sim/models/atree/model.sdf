@@ -1,0 +1,34 @@
+<?xml version="1.0" ?>
+<sdf version="1.5">
+  <model name="atree">
+    <static>true</static>
+    <link name="link">
+      <pose>0 0 0 1.570796 0 0</pose>
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>file:///home/zf/catkin_ws/src/limo_gazebo_sim/meshes/tree.STL</uri>
+            <scale>0.0015 0.0015 0.0015</scale>
+          </mesh>
+        </geometry>
+        <material>
+          <ambient>0.2 0.7 0.2 1</ambient>
+          <diffuse>0.2 0.7 0.2 1</diffuse>
+          <specular>0.1 0.1 0.1 1</specular>
+          <script>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+            <name>Gazebo/Green</name>
+          </script>
+        </material>
+      </visual>
+      <collision name="collision">
+        <geometry>
+          <mesh>
+            <uri>file:///home/zf/catkin_ws/src/limo_gazebo_sim/meshes/tree.STL</uri>
+            <scale>0.0015 0.0015 0.0015</scale>
+          </mesh>
+        </geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>
