@@ -19,11 +19,11 @@
       <gravity>0 0 -9.8</gravity>
     </physics>
 
-    <!-- 加载 SolidWorks 导出的 ROS1.STL 毕设场景模型 (位于 meshes/ 目录下，坐标对齐在 Gazebo 原点 (0,0)) -->
+    <!-- 加载 SolidWorks 最新导出的 ROS1.STL 毕设场景模型 (覆盖置于 meshes/ 目录下，坐标精准对齐在 Gazebo 原点 (0,0)) -->
     <model name="graduation_scene">
       <static>true</static>
       <!-- 姿态配置: [x y z roll pitch yaw] -->
-      <pose>-5.02 5.08 0 1.570796 0 0</pose>
+      <pose>-5.02 5.10 0 1.570796 0 0</pose>
       <link name="link">
         <visual name="visual">
           <geometry>
