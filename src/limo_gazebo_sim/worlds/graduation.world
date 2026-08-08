@@ -1,12 +1,28 @@
 <?xml version="1.0" ?>
 <sdf version="1.5">
   <world name="graduation_world">
-    <!-- 全局光源 -->
+    <!-- 真实感环境渲染配置: 云彩天空盒、大气漫反射与动态物理阴影 -->
+    <scene>
+      <sky>
+        <time>14.0</time>
+        <sunrise>6.0</sunrise>
+        <sunset>18.0</sunset>
+        <clouds>
+          <speed>12</speed>
+        </clouds>
+      </sky>
+      <ambient>0.5 0.5 0.5 1.0</ambient>
+      <background>0.6 0.78 1.0 1.0</background>
+      <shadows>true</shadows>
+      <grid>false</grid>
+    </scene>
+
+    <!-- 太阳真实方向光源配置 -->
     <include>
       <uri>model://sun</uri>
     </include>
 
-    <!-- 地平地面 -->
+    <!-- 真实感沥青/水泥地面 -->
     <include>
       <uri>model://ground_plane</uri>
     </include>
@@ -19,11 +35,10 @@
       <gravity>0 0 -9.8</gravity>
     </physics>
 
-    <!-- 加载 SolidWorks 最新导出的 ROS1.STL 毕设场景模型 (位于 meshes/ 目录下，坐标精准对齐在 Gazebo 原点 (0,0)) -->
+    <!-- 加载 SolidWorks 毕设场景模型 -->
     <model name="graduation_scene">
       <static>true</static>
-      <!-- 姿态配置: [x y z roll pitch yaw]
-           基于最新模型点云计算中心, 精准平放且几何中心对齐 Gazebo 原点 (0,0) -->
+      <!-- 姿态配置: [x y z roll pitch yaw] -->
       <pose>-4.816 4.896 0 1.570796 0 0</pose>
       <link name="link">
         <visual name="visual">
