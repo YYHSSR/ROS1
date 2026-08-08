@@ -1,28 +1,25 @@
 <?xml version="1.0" ?>
 <sdf version="1.5">
   <world name="graduation_world">
-    <!-- 真实感环境渲染配置: 云彩天空盒、大气漫反射与动态物理阴影 -->
+    <!-- 动态光照与自然昼夜交替系统: 随着仿真时间推移，太阳角度、照度与阴影移动动态变化 -->
     <scene>
       <sky>
-        <time>14.0</time>
+        <time>10.0</time>
         <sunrise>6.0</sunrise>
         <sunset>18.0</sunset>
         <clouds>
           <speed>12</speed>
         </clouds>
       </sky>
-      <ambient>0.5 0.5 0.5 1.0</ambient>
-      <background>0.6 0.78 1.0 1.0</background>
       <shadows>true</shadows>
-      <grid>false</grid>
     </scene>
 
-    <!-- 太阳真实方向光源配置 -->
+    <!-- 太阳方向光源 -->
     <include>
       <uri>model://sun</uri>
     </include>
 
-    <!-- 真实感沥青/水泥地面 -->
+    <!-- 地平地面 -->
     <include>
       <uri>model://ground_plane</uri>
     </include>
