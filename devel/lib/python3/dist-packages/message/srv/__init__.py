@@ -1,1 +1,0 @@
-/home/zf/catkin_ws/devel/.private/message/lib/python3/dist-packages/message/srv/__init__.py

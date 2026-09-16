@@ -1,2 +1,0 @@
-- setup-file:
-    local-name: /home/zf/catkin_ws/devel/.private/fkie_node_manager_daemon/setup.sh

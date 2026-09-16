@@ -1,1 +1,0 @@
-/home/zf/catkin_ws/devel/.private/message/include/message/text.h

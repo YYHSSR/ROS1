@@ -1,5 +1,0 @@
-limo_gazebo_sim
-/home/zf/catkin_ws/devel/.private/limo_gazebo_sim/share/limo_gazebo_sim/cmake/limo_gazebo_simConfig.cmake /home/zf/catkin_ws/devel/share/limo_gazebo_sim/cmake/limo_gazebo_simConfig.cmake
-/home/zf/catkin_ws/devel/.private/limo_gazebo_sim/share/limo_gazebo_sim/cmake/limo_gazebo_simConfig-version.cmake /home/zf/catkin_ws/devel/share/limo_gazebo_sim/cmake/limo_gazebo_simConfig-version.cmake
-/home/zf/catkin_ws/devel/.private/limo_gazebo_sim/lib/libgazebo_ros_ackerman.so /home/zf/catkin_ws/devel/lib/libgazebo_ros_ackerman.so
-/home/zf/catkin_ws/devel/.private/limo_gazebo_sim/lib/pkgconfig/limo_gazebo_sim.pc /home/zf/catkin_ws/devel/lib/pkgconfig/limo_gazebo_sim.pc

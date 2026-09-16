@@ -1,0 +1,14 @@
+material LimoMap
+{
+  technique
+  {
+    pass
+    {
+      texture_unit
+      {
+        texture limo_map.jpg
+        tex_address_mode clamp
+      }
+    }
+  }
+}

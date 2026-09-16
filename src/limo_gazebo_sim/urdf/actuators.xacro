@@ -1,0 +1,109 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+    <!-- ==================================================================== -->
+    <!-- 通用驱动轮组件 (Wheel): 包含物理网格、碰撞圆柱体、转动惯量与连续旋转关节 -->
+    <!-- ==================================================================== -->
+    <xacro:macro name="limo_wheel" params="parent_prefix wheel_prefix reflect *joint_pose">
+        <link name="${wheel_prefix}_wheel_link">
+            <inertial>
+                <origin xyz="0 0 0" />
+                <mass value="0.5" />
+                <inertia ixx="0.01055" ixy="0" ixz="0"
+                         iyy="0.00075" iyz="0"
+                         izz="0.01055" />
+            </inertial>
+            <visual>
+                <origin xyz="0 0 0" rpy="0 0 0" />
+                <geometry>
+                    <mesh filename="package://limo_gazebo_sim/CAD/limo-model/limo_wheel.dae" scale="${wheel_scale}" />
+                </geometry>
+            </visual>
+            <collision>
+                <origin xyz="0 ${wheel_length/2} 0" rpy="1.57 0 0" />
+                <geometry>
+                    <cylinder length="${wheel_length}" radius="${wheel_radius}" />
+                </geometry>
+            </collision>
+        </link>
+
+        <joint name="${wheel_prefix}_wheel" type="continuous">
+            <parent link="${parent_prefix}"/>
+            <child link="${wheel_prefix}_wheel_link"/>
+            <xacro:insert_block name="joint_pose"/>
+            <axis xyz="0 ${reflect*1} 0"/>
+        </joint>
+    </xacro:macro>
+
+    <!-- ==================================================================== -->
+    <!-- 通用速度控制传动配置 (Transmission) - 用于四轮差速或直接驱动模式 -->
+    <!-- ==================================================================== -->
+    <xacro:macro name="limo_wheel_transmission" params="wheel_prefix">
+        <transmission name="${wheel_prefix}_wheel_trans" type="SimpleTransmission">
+            <type>transmission_interface/SimpleTransmission</type>
+            <actuator name="${wheel_prefix}_wheel_motor">
+                <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+                <mechanicalReduction>1</mechanicalReduction>
+            </actuator>
+            <joint name="${wheel_prefix}_wheel">
+                <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+            </joint>
+        </transmission>
+    </xacro:macro>
+
+    <!-- ==================================================================== -->
+    <!-- 阿克曼前轮转向铰链节 (Steering Hinge): 包含转向偏转旋转关节、力矩传动配置及前轮装配 -->
+    <!-- ==================================================================== -->
+    <xacro:macro name="limo_steering_hinge" params="parent_prefix hinge_prefix wheel_prefix reflect *joint_pose">
+        <!-- 转向销构件 (Knuckle link) -->
+        <link name="${hinge_prefix}">
+            <inertial>
+                <mass value="0.25" />
+                <inertia ixx="0.00525" ixy="0" ixz="0"
+                         iyy="0.00035" iyz="0"
+                         izz="0.00525" />
+                <origin xyz="0 0 0" />
+            </inertial>
+            <visual>
+                <origin xyz="0 0 0" rpy="0 0 0" />
+                <geometry>
+                    <cylinder length="0.0002" radius="0.0002" />
+                </geometry>
+            </visual>
+            <collision>
+                <origin xyz="0 0 0" rpy="1.57 0 0" />
+                <geometry>
+                    <cylinder length="0.01" radius="0.01" />
+                </geometry>
+            </collision>
+        </link>
+
+        <!-- 转向偏转旋转关节 (Revolute joint) -->
+        <joint name="${hinge_prefix}_wheel" type="revolute">
+            <parent link="${parent_prefix}"/>
+            <child link="${hinge_prefix}"/>
+            <xacro:insert_block name="joint_pose"/>
+            <axis xyz="0 0 ${reflect*1}" />
+            <limit lower="-0.523598767" upper="0.523598767" effort="5" velocity="0.5" />
+            <dynamics damping="1.0" friction="2.0"/>
+        </joint>
+
+        <!-- 转向关节力矩控制传动接口 (由 ros_control 角度控制器驱动) -->
+        <transmission name="${hinge_prefix}_wheel_trans" type="SimpleTransmission">
+            <type>transmission_interface/SimpleTransmission</type>
+            <actuator name="${hinge_prefix}_wheel_motor">
+                <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+                <mechanicalReduction>1</mechanicalReduction>
+            </actuator>
+            <joint name="${hinge_prefix}_wheel">
+                <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+            </joint>
+        </transmission>
+
+        <!-- 挂载于此转向节之前轮 (复用通用轮系宏) -->
+        <xacro:limo_wheel parent_prefix="${hinge_prefix}" wheel_prefix="${wheel_prefix}" reflect="${reflect}">
+            <origin xyz="0 0 0" rpy="0 0 0" />
+        </xacro:limo_wheel>
+    </xacro:macro>
+
+</robot>

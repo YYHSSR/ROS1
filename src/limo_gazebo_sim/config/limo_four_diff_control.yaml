@@ -1,9 +1,17 @@
-# Publish all joint states -----------------------------------
+# ==============================================================================
+# 四轮差速滑移模式 (Skid-Steer / Four-Diff) - ROS Control 关节控制器与 PID 参数配置
+# ==============================================================================
+
+# 1. 关节状态发布控制器 (Joint State Controller)
+# 以 100Hz 频率实时发布所有车轮的角度/速度状态到 /joint_states
 limo_state_controller:
   type: joint_state_controller/JointStateController
   publish_rate: 100
+
+# 2. 车轮电机速度闭环增益参数 (Wheel Velocity PID)
+# 提供 Gazebo 物理引擎中四轮差速滑移转速控制的顺滑度和响应度
 /gazebo_ros_control/pid_gains:
-    front_left_wheel: {p: 1.0, i: 0, d: 0.01} 
-    front_right_wheel: {p: 1.0, i: 0, d: 0.01} 
-    rear_left_wheel: {p: 1.0, i: 0, d: 0.01} 
-    rear_right_wheel: {p: 1.0, i: 0, d: 0.01} 
+  front_left_wheel:  {p: 1.0, i: 0.0, d: 0.01}
+  front_right_wheel: {p: 1.0, i: 0.0, d: 0.01}
+  rear_left_wheel:   {p: 1.0, i: 0.0, d: 0.01}
+  rear_right_wheel:  {p: 1.0, i: 0.0, d: 0.01}

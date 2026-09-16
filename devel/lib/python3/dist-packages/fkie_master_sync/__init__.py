@@ -1,1 +1,0 @@
-/home/zf/catkin_ws/devel/.private/fkie_master_sync/lib/python3/dist-packages/fkie_master_sync/__init__.py

@@ -1,1 +1,0 @@
-/home/zf/catkin_ws/devel/.private/fkie_node_manager_daemon/lib/pkgconfig/fkie_node_manager_daemon.pc

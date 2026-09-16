@@ -1,0 +1,35 @@
+<?xml version="1.0" ?>
+<sdf version="1.5">
+  <model name="aman">
+    <static>true</static>
+    <link name="link">
+      <visual name="visual">
+        <pose>-0.097875 0.097875 0.022 1.570796 0 0</pose>
+        <geometry>
+          <mesh>
+            <uri>model://aman/meshes/man.STL</uri>
+            <scale>0.00135 0.00135 0.00135</scale>
+          </mesh>
+        </geometry>
+        <material>
+          <ambient>1.0 0.8 0.0 1</ambient>
+          <diffuse>1.0 0.8 0.0 1</diffuse>
+          <specular>0.1 0.1 0.1 1</specular>
+          <script>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+            <name>Gazebo/Yellow</name>
+          </script>
+        </material>
+      </visual>
+      <collision name="collision">
+        <pose>-0.097875 0.097875 0.022 1.570796 0 0</pose>
+        <geometry>
+          <mesh>
+            <uri>model://aman/meshes/man.STL</uri>
+            <scale>0.00135 0.00135 0.00135</scale>
+          </mesh>
+        </geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>

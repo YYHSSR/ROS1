@@ -1,1 +1,0 @@
-/home/zf/catkin_ws/devel/.private/fkie_master_sync/lib/fkie_master_sync/param_sync.py

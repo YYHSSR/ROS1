@@ -1,1 +1,0 @@
-/home/zf/catkin_ws/devel/.private/fkie_master_discovery/share/fkie_master_discovery/cmake/fkie_master_discoveryConfig.cmake

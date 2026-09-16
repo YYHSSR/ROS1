@@ -1,0 +1,224 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+    <!-- ==================================================================== -->
+    <!-- 激光雷达组件 (LiDAR): 包含物理外观、碰撞体、固定关节以及 Gazebo 射线传感器插件 -->
+    <!-- ==================================================================== -->
+    <xacro:macro name="limo_laser" params="parent_prefix frame_prefix *joint_pose">
+        <link name="${frame_prefix}_link">
+            <pose>0 0 0 0 0 0</pose>
+            <inertial>
+                <mass value="0.1"/>
+                <origin xyz="0.0 0 0" rpy="0 0 0"/>
+                <inertia ixx="1e-6" ixy="0" ixz="0"
+                         iyy="1e-6" iyz="0"
+                         izz="1e-6"/>
+            </inertial>
+            <visual name="laser_visual">
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <cylinder radius="0.04" length="0.02"/>
+                </geometry>
+                <material name="laser_material">
+                    <color rgba="0.1 0.1 0.2 1.0"/>
+                </material>
+            </visual>
+            <collision name="laser_collision">
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <cylinder radius="0.064" length="0.032"/>
+                </geometry>
+            </collision>
+        </link>
+
+        <joint name="laser_joint" type="fixed">
+            <xacro:insert_block name="joint_pose"/>
+            <parent link="${parent_prefix}"/>
+            <child link="${frame_prefix}_link"/>
+        </joint>
+
+        <gazebo reference="${frame_prefix}_link">
+            <material>Gazebo/Yellow</material>
+            <sensor type="ray" name="laser_sensor">
+                <pose>0 0 0 0 0 0</pose>
+                <visualize>false</visualize>
+                <update_rate>8</update_rate>
+                <ray>
+                    <scan>
+                        <horizontal>
+                            <samples>720</samples>
+                            <resolution>1</resolution>
+                            <min_angle>-2.09439504</min_angle>
+                            <max_angle>2.09439504</max_angle>
+                        </horizontal>
+                    </scan>
+                    <range>
+                        <min>0.08</min>
+                        <max>8.0</max>
+                        <resolution>0.01</resolution>
+                    </range>
+                    <noise>
+                        <type>gaussian</type>
+                        <mean>0.0</mean>
+                        <stddev>0.01</stddev>
+                    </noise>
+                </ray>
+                <plugin name="gazebo_ros_laser_sensor" filename="libgazebo_ros_laser.so">
+                    <topicName>/scan</topicName>
+                    <frameName>laser_link</frameName>
+                </plugin>
+            </sensor>
+        </gazebo>
+    </xacro:macro>
+
+    <!-- ==================================================================== -->
+    <!-- 深度相机组件 (Depth Camera): 包含物理外观、相机光学坐标系以及 OpenNI Kinect 插件 -->
+    <!-- ==================================================================== -->
+    <xacro:macro name="limo_depth_camera" params="parent_prefix frame_prefix *joint_pose">
+        <link name="${frame_prefix}_link">
+            <pose>0 0 0 0 0 0</pose>
+            <inertial>
+                <mass value="0.1"/>
+                <origin xyz="0.0 0 0" rpy="0 0 0"/>
+                <inertia ixx="1e-6" ixy="0" ixz="0"
+                         iyy="1e-6" iyz="0"
+                         izz="1e-6"/>
+            </inertial>
+            <visual name="depth_camera_visual">
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <box size="0.04 0.12 0.03"/>
+                </geometry>
+                <material name="depth_camera_material">
+                    <color rgba="0.1 0.1 0.2 1.0"/>
+                </material>
+            </visual>
+            <collision name="depth_camera_collision">
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <box size="0.04 0.12 0.03"/>
+                </geometry>
+            </collision>
+        </link>
+
+        <joint name="depth_camera_joint" type="fixed">
+            <xacro:insert_block name="joint_pose"/>
+            <parent link="${parent_prefix}"/>
+            <child link="${frame_prefix}_link"/>
+        </joint>
+
+        <!-- 相机光学参考系 (Optical frame) -->
+        <link name="depth_link"/>
+        <joint name="${frame_prefix}_to_camera_joint" type="fixed">
+            <origin xyz="0 0 0" rpy="${-M_PI/2} 0 ${-M_PI/2}"/>
+            <parent link="${frame_prefix}_link"/>
+            <child link="depth_link"/>
+        </joint>
+
+        <gazebo reference="${frame_prefix}_link">
+            <material>Gazebo/Yellow</material>
+            <sensor name="sensor_camera" type="depth">
+                <pose>0.0 0.0 0.0 0.0 0.0 0.0</pose>
+                <always_on>true</always_on>
+                <visualize>true</visualize>
+                <update_rate>10.0</update_rate>
+                <camera name="head">
+                    <horizontal_fov>1.3962634</horizontal_fov>
+                    <image>
+                        <width>640</width>
+                        <height>480</height>
+                        <format>R8G8B8</format>
+                    </image>
+                    <clip>
+                        <near>0.02</near>
+                        <far>300</far>
+                    </clip>
+                </camera>
+                <plugin name="gazebo_ros_depth_camera_sensor" filename="libgazebo_ros_openni_kinect.so">
+                    <baseline>0.2</baseline>
+                    <alwaysOn>true</alwaysOn>
+                    <updateRate>0.0</updateRate>
+                    <cameraName>camera_ir</cameraName>
+                    <imageTopicName>/color/image_raw</imageTopicName>
+                    <cameraInfoTopicName>/color/camera_info</cameraInfoTopicName>
+                    <depthImageTopicName>/depth/image_raw</depthImageTopicName>
+                    <depthImageCameraInfoTopicName>/depth/camera_info</depthImageCameraInfoTopicName>
+                    <pointCloudTopicName>/depth/3Dpoints</pointCloudTopicName>
+                    <frameName>depth_link</frameName>
+                    <cameraname>depth_camera_link</cameraname>
+                    <pointCloudCutoff>0.5</pointCloudCutoff>
+                    <pointCloudCutoffMax>3.0</pointCloudCutoffMax>
+                    <distortionK1>0</distortionK1>
+                    <distortionK2>0</distortionK2>
+                    <distortionK3>0</distortionK3>
+                    <distortionT1>0</distortionT1>
+                    <distortionT2>0</distortionT2>
+                    <CxPrime>0</CxPrime>
+                    <Cx>0</Cx>
+                    <Cy>0</Cy>
+                    <focalLength>0</focalLength>
+                    <hackBaseline>0</hackBaseline>
+                </plugin>
+            </sensor>
+        </gazebo>
+    </xacro:macro>
+
+    <!-- ==================================================================== -->
+    <!-- 惯性测量单元 (IMU): 包含物理外观与 Gazebo IMU 传感器插件 -->
+    <!-- ==================================================================== -->
+    <xacro:macro name="limo_imu" params="parent_prefix frame_prefix *joint_pose">
+        <link name="${frame_prefix}_link">
+            <pose>0 0 0 0 0 0</pose>
+            <inertial>
+                <mass value="0.01"/>
+                <origin xyz="0.0 0 0" rpy="0 0 0"/>
+                <inertia ixx="1e-7" ixy="0" ixz="0"
+                         iyy="1e-7" iyz="0"
+                         izz="1e-7"/>
+            </inertial>
+            <visual name="imu_visual">
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <box size="0.002 0.002 0.002"/>
+                </geometry>
+                <material name="imu_material">
+                    <color rgba="0.1 0.1 0.2 1.0"/>
+                </material>
+            </visual>
+            <collision name="imu_collision">
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <box size="0.002 0.002 0.002"/>
+                </geometry>
+            </collision>
+        </link>
+
+        <joint name="imu_joint" type="fixed">
+            <xacro:insert_block name="joint_pose"/>
+            <parent link="${parent_prefix}"/>
+            <child link="${frame_prefix}_link"/>
+        </joint>
+
+        <gazebo reference="${frame_prefix}_link">
+            <material>Gazebo/Yellow</material>
+            <gravity>true</gravity>
+            <sensor name="imu_sensor" type="imu">
+                <always_on>true</always_on>
+                <update_rate>100</update_rate>
+                <visualize>true</visualize>
+                <topic>__default_topic__</topic>
+                <plugin filename="libgazebo_ros_imu_sensor.so" name="imu_plugin">
+                    <topicName>/imu</topicName>
+                    <bodyName>${frame_prefix}_link</bodyName>
+                    <updateRateHZ>100.0</updateRateHZ>
+                    <gaussianNoise>0.001</gaussianNoise>
+                    <xyzOffset>0 0 0</xyzOffset>
+                    <rpyOffset>0 0 0</rpyOffset>
+                    <frameName>imu_link</frameName>
+                </plugin>
+                <pose>0 0 0 0 0 0</pose>
+            </sensor>
+        </gazebo>
+    </xacro:macro>
+
+</robot>

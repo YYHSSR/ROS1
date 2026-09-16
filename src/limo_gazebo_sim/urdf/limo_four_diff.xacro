@@ -1,15 +1,15 @@
 <?xml version="1.0"?>
-
 <robot name="limo_four_diff" xmlns:xacro="http://ros.org/wiki/xacro">
 
     <xacro:arg name="robot_namespace" default="/" />
-    <xacro:include filename="$(find limo_gazebo_sim)/urdf/limo_xacro.xacro" />
-    <xacro:include filename="$(find limo_gazebo_sim)/urdf/limo_four_diff.gazebo" />
 
-    <!-- Variables -->
+    <!-- 导入解耦后的传感器与执行机构模块 -->
+    <xacro:include filename="$(find limo_gazebo_sim)/urdf/sensors.xacro" />
+    <xacro:include filename="$(find limo_gazebo_sim)/urdf/actuators.xacro" />
+
+    <!-- ================= 几何与物理参数定义 ================= -->
     <xacro:property name="M_PI" value="3.14159"/>
 
-    <!-- Vehicle Geometries -->
     <xacro:property name="base_x_size" value="0.13" />
     <xacro:property name="base_y_size" value="0.12" />
     <xacro:property name="base_z_size" value="0.1" />
@@ -21,27 +21,29 @@
 
     <xacro:property name="wheel_length" value="0.045" />
     <xacro:property name="wheel_radius" value="0.045" />
-  <link name="base_footprint"/>
+    <xacro:property name="wheel_scale" value="2 2 2" />
 
-  <joint name="base_joint" type="fixed">
-    <parent link="base_footprint"/>
-    <child link="base_link"/>
-    <origin xyz="0.0 0.0 0.15" rpy="0 0 0"/>
-  </joint>
-    <!-- Base link -->
+    <!-- ================= 底盘基准与车身 Link ================= -->
+    <link name="base_footprint"/>
+
+    <joint name="base_joint" type="fixed">
+        <parent link="base_footprint"/>
+        <child link="base_link"/>
+        <origin xyz="0.0 0.0 0.15" rpy="0 0 0"/>
+    </joint>
+
     <link name="base_link">
         <visual>
             <origin xyz="0 0 -0.15" rpy="0 0 1.57" />
             <geometry>
-                <mesh filename="package://limo_gazebo_sim/meshes/limo_base.dae" scale="1 1 1"/>
+                <mesh filename="package://limo_gazebo_sim/CAD/limo-model/limo_base.dae" scale="1 1 1"/>
             </geometry>
         </visual>
         <collision>
-            <!--origin xyz="0 0 -0.15" rpy="0 0 1.57" /-->
             <origin xyz="0 0 0" rpy="0 0 0" />
-          <geometry>
-              <box size="${base_x_size} ${base_y_size} ${base_z_size}"/>
-          </geometry>
+            <geometry>
+                <box size="${base_x_size} ${base_y_size} ${base_z_size}"/>
+            </geometry>
         </collision>
     </link>
 
@@ -61,6 +63,7 @@
         <child link="inertial_link" />
     </joint>
 
+    <!-- ================= 传感器装配 (包含 Gazebo 插件) ================= -->
     <xacro:limo_laser parent_prefix="base_link" frame_prefix="laser">
         <origin xyz="0.103 0 -0.034" rpy="0 0 0"/>
     </xacro:limo_laser>
@@ -73,19 +76,95 @@
         <origin xyz="0.0 0 -0.1" rpy="0 0 0"/>
     </xacro:limo_imu>
 
+    <!-- ================= 四轮差速驱动轮系装配 ================= -->
+    <!-- 左前轮 -->
     <xacro:limo_wheel parent_prefix="base_link" wheel_prefix="front_left" reflect="1">
-        <origin xyz="${wheelbase/2} ${track/2} ${wheel_vertical_offset}" rpy="0 0  0" />
+        <origin xyz="${wheelbase/2} ${track/2} ${wheel_vertical_offset}" rpy="0 0 0" />
     </xacro:limo_wheel>
+    <xacro:limo_wheel_transmission wheel_prefix="front_left" />
 
+    <!-- 右前轮 -->
     <xacro:limo_wheel parent_prefix="base_link" wheel_prefix="front_right" reflect="-1">
         <origin xyz="${wheelbase/2} ${-track/2} ${wheel_vertical_offset}" rpy="${M_PI} 0 0" />
     </xacro:limo_wheel>
+    <xacro:limo_wheel_transmission wheel_prefix="front_right" />
 
+    <!-- 左后轮 -->
     <xacro:limo_wheel parent_prefix="base_link" wheel_prefix="rear_left" reflect="1">
         <origin xyz="${-wheelbase/2} ${track/2} ${wheel_vertical_offset}" rpy="0 0 0" />
     </xacro:limo_wheel>
+    <xacro:limo_wheel_transmission wheel_prefix="rear_left" />
 
+    <!-- 右后轮 -->
     <xacro:limo_wheel parent_prefix="base_link" wheel_prefix="rear_right" reflect="-1">
         <origin xyz="${-wheelbase/2} ${-track/2} ${wheel_vertical_offset}" rpy="${M_PI} 0 0" />
     </xacro:limo_wheel>
+    <xacro:limo_wheel_transmission wheel_prefix="rear_right" />
+
+    <!-- ================= Gazebo 仿真环境动力学与控制插件 ================= -->
+    <gazebo reference="front_left_wheel">
+        <mu1>10</mu1>
+        <mu2>10</mu2>
+        <kp>10000000.0</kp>
+        <kd>1.0</kd>
+        <minDepth>0.01</minDepth>
+        <fdir1>1 0 0</fdir1>
+        <maxContacts value="64"/>
+    </gazebo>
+    <gazebo reference="front_right_wheel">
+        <mu1>10</mu1>
+        <mu2>10</mu2>
+        <kp>10000000.0</kp>
+        <kd>1.0</kd>
+        <minDepth>0.01</minDepth>
+        <fdir1>1 0 0</fdir1>
+        <maxContacts value="64"/>
+    </gazebo>
+    <gazebo reference="rear_left_wheel">
+        <mu1>10</mu1>
+        <mu2>10</mu2>
+        <kp>10000000.0</kp>
+        <kd>1.0</kd>
+        <minDepth>0.01</minDepth>
+        <fdir1>1 0 0</fdir1>
+        <maxContacts value="64"/>
+    </gazebo>
+    <gazebo reference="rear_right_wheel">
+        <mu1>10</mu1>
+        <mu2>10</mu2>
+        <kp>10000000.0</kp>
+        <kd>1.0</kd>
+        <minDepth>0.01</minDepth>
+        <fdir1>1 0 0</fdir1>
+        <maxContacts value="64"/>
+    </gazebo>
+
+    <gazebo>
+        <!-- ros_control 控制器插件 -->
+        <plugin name="gazebo_ros_control" filename="libgazebo_ros_control.so">
+            <robotNamespace>$(arg robot_namespace)</robotNamespace>
+        </plugin>
+
+        <!-- 四轮差速滑移驱动插件 -->
+        <plugin name="four_diff_controller" filename="libgazebo_ros_skid_steer_drive.so">
+            <updateRate>100.0</updateRate>
+            <robotNamespace>$(arg robot_namespace)</robotNamespace>
+            <leftFrontJoint>front_left_wheel</leftFrontJoint>
+            <rightFrontJoint>front_right_wheel</rightFrontJoint>
+            <leftRearJoint>rear_left_wheel</leftRearJoint>
+            <rightRearJoint>rear_right_wheel</rightRearJoint>
+            <wheelSeparation>0.172</wheelSeparation>
+            <wheelDiameter>0.09</wheelDiameter>
+            <robotBaseFrame>base_footprint</robotBaseFrame>
+            <commandTopic>cmd_vel</commandTopic>
+            <torque>50</torque>
+            <broadcastTF>true</broadcastTF>
+            <odometryTopic>odom</odometryTopic>
+            <odometryFrame>odom</odometryFrame>
+            <covariance_x>0.000100</covariance_x>
+            <covariance_y>0.000100</covariance_y>
+            <covariance_yaw>0.010000</covariance_yaw>
+        </plugin>
+    </gazebo>
+
 </robot>

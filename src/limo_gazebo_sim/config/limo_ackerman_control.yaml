@@ -1,27 +1,35 @@
-# Publish all joint states -----------------------------------
+# ==============================================================================
+# 阿克曼转向模式 (Ackermann) - ROS Control 关节控制器与 PID 参数配置
+# ==============================================================================
+
+# 1. 关节状态发布控制器 (Joint State Controller)
+# 以 100Hz 频率实时发布所有轮子和转向铰链的角度/速度状态到 /joint_states
 limo_state_controller:
   type: joint_state_controller/JointStateController
   publish_rate: 100
 
-# Joint velocity controllers ---------------------------------
+# 2. 车轮电机速度闭环增益参数 (Wheel Velocity PID)
+# 提供 Gazebo 物理引擎中车轮转速控制的顺滑度和响应度
 /gazebo_ros_control/pid_gains:
-    front_left_wheel: {p: 1.0, i: 0, d: 0.01} 
-    front_right_wheel: {p: 1.0, i: 0, d: 0.01} 
-    rear_left_wheel: {p: 1.0, i: 0, d: 0.01} 
-    rear_right_wheel: {p: 1.0, i: 0, d: 0.01} 
+  front_left_wheel:  {p: 1.0, i: 0.0, d: 0.01}
+  front_right_wheel: {p: 1.0, i: 0.0, d: 0.01}
+  rear_left_wheel:   {p: 1.0, i: 0.0, d: 0.01}
+  rear_right_wheel:  {p: 1.0, i: 0.0, d: 0.01}
 
-# Position Controllers ---------------------------------------
+# 3. 前轮转向铰链位置控制器 (Steering Knuckle Effort Controllers)
+# 控制左右前轮转向销的偏转角度（接收来自 libgazebo_ros_ackerman.so 的角度指令）
 limo_fl_steering_hinge_controller:
   type: effort_controllers/JointPositionController
   joint: left_steering_hinge_wheel
-  pid: 
+  pid:
     p: 100.0
     i: 0.1
     d: 0.1
+
 limo_fr_steering_hinge_controller:
   type: effort_controllers/JointPositionController
   joint: right_steering_hinge_wheel
-  pid: 
+  pid:
     p: 100.0
     i: 0.1
     d: 0.1

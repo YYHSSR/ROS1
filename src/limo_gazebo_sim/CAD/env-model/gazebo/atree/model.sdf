@@ -1,0 +1,35 @@
+<?xml version="1.0" ?>
+<sdf version="1.5">
+  <model name="atree">
+    <static>true</static>
+    <link name="link">
+      <visual name="visual">
+        <pose>-0.0891 0.03105 0.022 1.570796 0 0</pose>
+        <geometry>
+          <mesh>
+            <uri>model://atree/meshes/tree.STL</uri>
+            <scale>0.00135 0.00135 0.00135</scale>
+          </mesh>
+        </geometry>
+        <material>
+          <ambient>0.2 0.7 0.2 1</ambient>
+          <diffuse>0.2 0.7 0.2 1</diffuse>
+          <specular>0.1 0.1 0.1 1</specular>
+          <script>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+            <name>Gazebo/Green</name>
+          </script>
+        </material>
+      </visual>
+      <collision name="collision">
+        <pose>-0.0891 0.03105 0.022 1.570796 0 0</pose>
+        <geometry>
+          <mesh>
+            <uri>model://atree/meshes/tree.STL</uri>
+            <scale>0.00135 0.00135 0.00135</scale>
+          </mesh>
+        </geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>

@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <assert.h>
+#include <cmath>
 
 #include <limo_gazebo/gazebo_ros_ackerman_drive.h>
 
@@ -9,9 +10,7 @@
 
 #include <ros/ros.h>
 #include <tf/transform_broadcaster.h>
-#include <tf/transform_listener.h>
 #include <geometry_msgs/Twist.h>
-#include <nav_msgs/GetMap.h>
 #include <nav_msgs/Odometry.h>
 #include <boost/bind.hpp>
 #include <boost/thread/mutex.hpp>
@@ -19,18 +18,41 @@
 namespace gazebo {
 
 enum {
-    RIGHT_FRONT=0,
-    LEFT_FRONT=1,
-    RIGHT_REAR=2,
-    LEFT_REAR=3,
+    RIGHT_FRONT = 0,
+    LEFT_FRONT = 1,
+    RIGHT_REAR = 2,
+    LEFT_REAR = 3,
 };
 
-GazeboRosAckermanDrive::GazeboRosAckermanDrive() {}
+GazeboRosAckermanDrive::GazeboRosAckermanDrive()
+    : rosnode_(NULL),
+      transform_broadcaster_(NULL),
+      alive_(false),
+      x_(0.0),
+      rot_(0.0),
+      max_steer_angle_central_(0.523598767),
+      track_(0.28),
+      wheelbase_(0.4) {}
 
 // Destructor
 GazeboRosAckermanDrive::~GazeboRosAckermanDrive() {
-    delete rosnode_;
-    delete transform_broadcaster_;
+    alive_ = false;
+    if (update_connection_) {
+        update_connection_.reset();
+    }
+    if (callback_queue_thread_.joinable()) {
+        queue_.clear();
+        queue_.disable();
+        callback_queue_thread_.join();
+    }
+    if (rosnode_) {
+        delete rosnode_;
+        rosnode_ = NULL;
+    }
+    if (transform_broadcaster_) {
+        delete transform_broadcaster_;
+        transform_broadcaster_ = NULL;
+    }
 }
 
 // Load the controller
@@ -44,23 +66,19 @@ void GazeboRosAckermanDrive::Load(physics::ModelPtr _parent, sdf::ElementPtr _sd
                        this->robot_namespace_.c_str());
     }
     else {
-        this->robot_namespace_ = _sdf->GetElement("robotNamespace")->Get<std::string>() + "/";
+        this->robot_namespace_ = _sdf->GetElement("robotNamespace")->Get<std::string>();
     }
 
     this->broadcast_tf_ = false;
     if (!_sdf->HasElement("broadcastTF")) {
-        if (!this->broadcast_tf_) {
-            ROS_INFO_NAMED("ackerman_drive", "GazeboRosAckermanDrive Plugin (ns = %s) missing <broadcastTF>, defaults to false.",this->robot_namespace_.c_str());
-        }
-        else {
-            ROS_INFO_NAMED("ackerman_drive", "GazeboRosAckermanDrive Plugin (ns = %s) missing <broadcastTF>, defaults to true.",this->robot_namespace_.c_str());
-        }
+        ROS_INFO_NAMED("ackerman_drive", "GazeboRosAckermanDrive Plugin (ns = %s) missing <broadcastTF>, defaults to false.",
+                       this->robot_namespace_.c_str());
     }
     else {
         this->broadcast_tf_ = _sdf->GetElement("broadcastTF")->Get<bool>();
     }
 
-    this->left_front_joint_name_ = "left_front_joint";
+    this->left_front_joint_name_ = "front_left_wheel";
     if (!_sdf->HasElement("leftFrontJoint")) {
         ROS_WARN_NAMED("ackerman_drive", "GazeboRosAckermanDrive Plugin (ns = %s) missing <leftFrontJoint>, defaults to \"%s\"",
                        this->robot_namespace_.c_str(), this->left_front_joint_name_.c_str());
@@ -69,7 +87,7 @@ void GazeboRosAckermanDrive::Load(physics::ModelPtr _parent, sdf::ElementPtr _sd
         this->left_front_joint_name_ = _sdf->GetElement("leftFrontJoint")->Get<std::string>();
     }
 
-    this->right_front_joint_name_ = "right_front_joint";
+    this->right_front_joint_name_ = "front_right_wheel";
     if (!_sdf->HasElement("rightFrontJoint")) {
         ROS_WARN_NAMED("ackerman_drive", "GazeboRosAckermanDrive Plugin (ns = %s) missing <rightFrontJoint>, defaults to \"%s\"",
                        this->robot_namespace_.c_str(), this->right_front_joint_name_.c_str());
@@ -78,7 +96,7 @@ void GazeboRosAckermanDrive::Load(physics::ModelPtr _parent, sdf::ElementPtr _sd
         this->right_front_joint_name_ = _sdf->GetElement("rightFrontJoint")->Get<std::string>();
     }
 
-    this->left_rear_joint_name_ = "left_rear_joint";
+    this->left_rear_joint_name_ = "rear_left_wheel";
     if (!_sdf->HasElement("leftRearJoint")) {
         ROS_WARN_NAMED("ackerman_drive", "GazeboRosAckermanDrive Plugin (ns = %s) missing <leftRearJoint>, defaults to \"%s\"",
                        this->robot_namespace_.c_str(), this->left_rear_joint_name_.c_str());
@@ -87,7 +105,7 @@ void GazeboRosAckermanDrive::Load(physics::ModelPtr _parent, sdf::ElementPtr _sd
         this->left_rear_joint_name_ = _sdf->GetElement("leftRearJoint")->Get<std::string>();
     }
 
-    this->right_rear_joint_name_ = "right_rear_joint";
+    this->right_rear_joint_name_ = "rear_right_wheel";
     if (!_sdf->HasElement("rightRearJoint")) {
         ROS_WARN_NAMED("ackerman_drive", "GazeboRosAckermanDrive Plugin (ns = %s) missing <rightRearJoint>, defaults to \"%s\"",
                        this->robot_namespace_.c_str(), this->right_rear_joint_name_.c_str());
@@ -96,42 +114,62 @@ void GazeboRosAckermanDrive::Load(physics::ModelPtr _parent, sdf::ElementPtr _sd
         this->right_rear_joint_name_ = _sdf->GetElement("rightRearJoint")->Get<std::string>();
     }
 
-    this->left_hinge_joint_name_ = "left_hinge_joint";
+    this->left_hinge_joint_name_ = "left_steering_hinge_wheel";
     if (!_sdf->HasElement("leftHingeJoint")) {
         ROS_WARN_NAMED("ackerman_drive", "GazeboRosAckermanDrive Plugin (ns = %s) missing <leftHingeJoint>, defaults to \"%s\"",
-                       this->robot_namespace_.c_str(), this->right_rear_joint_name_.c_str());
+                       this->robot_namespace_.c_str(), this->left_hinge_joint_name_.c_str());
     }
     else {
         this->left_hinge_joint_name_ = _sdf->GetElement("leftHingeJoint")->Get<std::string>();
     }
 
-    this->right_hinge_joint_name_ = "right_hinge_joint";
+    this->right_hinge_joint_name_ = "right_steering_hinge_wheel";
     if (!_sdf->HasElement("rightHingeJoint")) {
-        ROS_WARN_NAMED("ackerman_drive", "GazeboRosAckermanDrive Plugin (ns = %s) missing <rightHingeJoint>, defaults to \"%s\"", this->robot_namespace_.c_str(), this->right_rear_joint_name_.c_str());
+        ROS_WARN_NAMED("ackerman_drive", "GazeboRosAckermanDrive Plugin (ns = %s) missing <rightHingeJoint>, defaults to \"%s\"",
+                       this->robot_namespace_.c_str(), this->right_hinge_joint_name_.c_str());
     }
     else {
         this->right_hinge_joint_name_ = _sdf->GetElement("rightHingeJoint")->Get<std::string>();
     }
 
-    this->wheel_separation_ = 0.4;
-
+    this->wheel_separation_ = 0.344;
     if (!_sdf->HasElement("wheelSeparation")) {
-        ROS_WARN_NAMED("ackerman_drive", "GazeboRosAckermanDrive Plugin (ns = %s) missing <wheelSeparation>, defaults to value from robot_description: %f",
+        ROS_WARN_NAMED("ackerman_drive", "GazeboRosAckermanDrive Plugin (ns = %s) missing <wheelSeparation>, defaults to %f",
                        this->robot_namespace_.c_str(), this->wheel_separation_);
     }
     else {
         this->wheel_separation_ = _sdf->GetElement("wheelSeparation")->Get<double>();
     }
 
-    this->wheel_diameter_ = 0.15;
+    this->wheel_diameter_ = 0.18;
     if (!_sdf->HasElement("wheelDiameter")) {
-        ROS_WARN_NAMED("ackerman_drive", "GazeboRosAckermanDrive Plugin (ns = %s) missing <wheelDiameter>, defaults to %f", this->robot_namespace_.c_str(), this->wheel_diameter_);
+        ROS_WARN_NAMED("ackerman_drive", "GazeboRosAckermanDrive Plugin (ns = %s) missing <wheelDiameter>, defaults to %f",
+                       this->robot_namespace_.c_str(), this->wheel_diameter_);
     }
     else {
         this->wheel_diameter_ = _sdf->GetElement("wheelDiameter")->Get<double>();
     }
 
-    this->torque = 5.0;
+    // 动态读取车辆轴距与轮距参数 (支持通过 SDF 灵活配置)
+    this->wheelbase_ = 0.4;
+    if (_sdf->HasElement("wheelBase")) {
+        this->wheelbase_ = _sdf->GetElement("wheelBase")->Get<double>();
+    }
+    else if (_sdf->HasElement("wheelbase")) {
+        this->wheelbase_ = _sdf->GetElement("wheelbase")->Get<double>();
+    }
+
+    this->track_ = this->wheel_separation_;
+    if (_sdf->HasElement("wheelTrack")) {
+        this->track_ = _sdf->GetElement("wheelTrack")->Get<double>();
+    }
+
+    this->max_steer_angle_central_ = 0.523598767; // ~30 deg
+    if (_sdf->HasElement("maxSteerAngle")) {
+        this->max_steer_angle_central_ = _sdf->GetElement("maxSteerAngle")->Get<double>();
+    }
+
+    this->torque = 50.0;
     if (!_sdf->HasElement("torque")) {
         ROS_WARN_NAMED("ackerman_drive", "GazeboRosAckermanDrive Plugin (ns = %s) missing <torque>, defaults to %f",
                        this->robot_namespace_.c_str(), this->torque);
@@ -186,39 +224,22 @@ void GazeboRosAckermanDrive::Load(physics::ModelPtr _parent, sdf::ElementPtr _sd
     }
 
     this->covariance_x_ = 0.0001;
-    if (!_sdf->HasElement("covariance_x")) {
-        ROS_WARN_NAMED("ackerman_drive", "GazeboRosAckermanDrive Plugin (ns = %s) missing <covariance_x>, defaults to %f",
-                       this->robot_namespace_.c_str(), covariance_x_);
-    }
-    else {
+    if (_sdf->HasElement("covariance_x")) {
         covariance_x_ = _sdf->GetElement("covariance_x")->Get<double>();
     }
 
     this->covariance_y_ = 0.0001;
-    if (!_sdf->HasElement("covariance_y")) {
-        ROS_WARN_NAMED("ackerman_drive", "GazeboRosAckermanDrive Plugin (ns = %s) missing <covariance_y>, defaults to %f",
-                       this->robot_namespace_.c_str(), covariance_y_);
-    }
-    else {
+    if (_sdf->HasElement("covariance_y")) {
         covariance_y_ = _sdf->GetElement("covariance_y")->Get<double>();
     }
 
     this->covariance_yaw_ = 0.01;
-    if (!_sdf->HasElement("covariance_yaw")) {
-        ROS_WARN_NAMED("ackerman_drive", "GazeboRosAckermanDrive Plugin (ns = %s) missing <covariance_yaw>, defaults to %f",
-                       this->robot_namespace_.c_str(), covariance_yaw_);
-    }
-    else {
+    if (_sdf->HasElement("covariance_yaw")) {
         covariance_yaw_ = _sdf->GetElement("covariance_yaw")->Get<double>();
     }
 
-    // Initialize update rate stuff
-    if (this->update_rate_ > 0.0) {
-        this->update_period_ = 1.0 / this->update_rate_;
-    }
-    else {
-        this->update_period_ = 0.0;
-    }
+    // Initialize update rate
+    this->update_period_ = (this->update_rate_ > 0.0) ? (1.0 / this->update_rate_) : 0.0;
 
 #if GAZEBO_MAJOR_VERSION >= 8
     last_update_time_ = this->world->SimTime();
@@ -226,7 +247,6 @@ void GazeboRosAckermanDrive::Load(physics::ModelPtr _parent, sdf::ElementPtr _sd
     last_update_time_ = this->world->GetSimTime();
 #endif
 
-    // Initialize velocity stuff
     wheel_speed_[RIGHT_FRONT] = 0;
     wheel_speed_[LEFT_FRONT] = 0;
     wheel_speed_[RIGHT_REAR] = 0;
@@ -243,31 +263,31 @@ void GazeboRosAckermanDrive::Load(physics::ModelPtr _parent, sdf::ElementPtr _sd
 
     if (!joints[LEFT_FRONT]) {
         char error[200];
-        snprintf(error, 200, "GazeboRosAckermanDrive Plugin (ns = %s) couldn't get left front hinge joint named \"%s\"",
+        snprintf(error, 200, "GazeboRosAckermanDrive Plugin (ns = %s) couldn't get left front wheel joint named \"%s\"",
                  this->robot_namespace_.c_str(), this->left_front_joint_name_.c_str());
         gzthrow(error);
     }
 
     if (!joints[RIGHT_FRONT]) {
         char error[200];
-        snprintf(error, 200, "GazeboRosAckermanDrive Plugin (ns = %s) couldn't get right front hinge joint named \"%s\"",
+        snprintf(error, 200, "GazeboRosAckermanDrive Plugin (ns = %s) couldn't get right front wheel joint named \"%s\"",
                  this->robot_namespace_.c_str(), this->right_front_joint_name_.c_str());
         gzthrow(error);
     }
 
     if (!joints[LEFT_REAR]) {
-       char error[200];
-       snprintf(error, 200, "GazeboRosAckermanDrive Plugin (ns = %s) couldn't get left rear hinge joint named \"%s\"",
-                this->robot_namespace_.c_str(), this->left_rear_joint_name_.c_str());
-       gzthrow(error);
-   }
+        char error[200];
+        snprintf(error, 200, "GazeboRosAckermanDrive Plugin (ns = %s) couldn't get left rear wheel joint named \"%s\"",
+                 this->robot_namespace_.c_str(), this->left_rear_joint_name_.c_str());
+        gzthrow(error);
+    }
 
-   if (!joints[RIGHT_REAR]) {
-       char error[200];
-       snprintf(error, 200, "GazeboRosAckermanDrive Plugin (ns = %s) couldn't get right rear hinge joint named \"%s\"",
-                this->robot_namespace_.c_str(), this->right_rear_joint_name_.c_str());
-       gzthrow(error);
-   }
+    if (!joints[RIGHT_REAR]) {
+        char error[200];
+        snprintf(error, 200, "GazeboRosAckermanDrive Plugin (ns = %s) couldn't get right rear wheel joint named \"%s\"",
+                 this->robot_namespace_.c_str(), this->right_rear_joint_name_.c_str());
+        gzthrow(error);
+    }
 
 #if GAZEBO_MAJOR_VERSION > 2
     joints[LEFT_FRONT]->SetParam("fmax", 0, torque);
@@ -281,38 +301,45 @@ void GazeboRosAckermanDrive::Load(physics::ModelPtr _parent, sdf::ElementPtr _sd
     joints[RIGHT_REAR]->SetMaxForce(0, torque);
 #endif
 
-    // Make sure the ROS node for Gazebo has already been initialized
     if (!ros::isInitialized()) {
-        ROS_FATAL_STREAM_NAMED("ackerman_drive", "A ROS node for Gazebo has not been initialized, unable to load plugin. "
-                               << "Load the Gazebo system plugin 'libgazebo_ros_api_plugin.so' in the gazebo_ros package)");
+        ROS_FATAL_STREAM_NAMED("ackerman_drive", "A ROS node for Gazebo has not been initialized, unable to load plugin.");
         return;
     }
 
     rosnode_ = new ros::NodeHandle(this->robot_namespace_);
-
-    ROS_INFO_NAMED("ackerman_drive", "Starting GazeboRosAckermanDrive Plugin (ns = %s)", this->robot_namespace_.c_str());
+    ROS_INFO_NAMED("ackerman_drive", "Starting GazeboRosAckermanDrive Plugin (ns = %s, wheelbase = %.3fm, track = %.3fm)",
+                   this->robot_namespace_.c_str(), this->wheelbase_, this->track_);
 
     tf_prefix_ = tf::getPrefixParam(*rosnode_);
     transform_broadcaster_ = new tf::TransformBroadcaster();
 
-    // ROS: Subscribe to the velocity command topic (usually "cmd_vel")
-    ros::SubscribeOptions so = ros::SubscribeOptions::create<geometry_msgs::Twist>(command_topic_, 1,
-        boost::bind(&GazeboRosAckermanDrive::CmdVelCallback, this, _1), ros::VoidPtr(), &queue_);
+    ros::SubscribeOptions so = ros::SubscribeOptions::create<geometry_msgs::Twist>(
+        command_topic_, 1,
+        boost::bind(&GazeboRosAckermanDrive::CmdVelCallback, this, _1),
+        ros::VoidPtr(), &queue_);
 
     cmd_vel_subscriber_ = rosnode_->subscribe(so);
-    std::string motor_steer_fr_topic_ = robot_namespace_ + "/limo_fr_steering_hinge_controller/command";
-    std::string motor_steer_fl_topic_ = robot_namespace_ + "/limo_fl_steering_hinge_controller/command";
+
+    std::string prefix = this->robot_namespace_;
+    if (!prefix.empty() && prefix.back() != '/') {
+        prefix += "/";
+    }
+    std::string motor_steer_fr_topic_ = prefix + "limo_fr_steering_hinge_controller/command";
+    std::string motor_steer_fl_topic_ = prefix + "limo_fl_steering_hinge_controller/command";
+
     motor_steer_fr_pub_ = rosnode_->advertise<std_msgs::Float64>(motor_steer_fr_topic_, 50);
     motor_steer_fl_pub_ = rosnode_->advertise<std_msgs::Float64>(motor_steer_fl_topic_, 50);
     odometry_publisher_ = rosnode_->advertise<nav_msgs::Odometry>(odometry_topic_, 1);
-    last_motor_cmd[0].data=0;
-    last_motor_cmd[1].data=0;
-    // start custom queue for diff drive
+
+    last_motor_cmd[STEER_RIGHT].data = 0;
+    last_motor_cmd[STEER_LEFT].data = 0;
+
+    // Start custom queue thread
     this->callback_queue_thread_ = boost::thread(boost::bind(&GazeboRosAckermanDrive::QueueThread, this));
 
-    // listen to the update event (broadcast every simulation iteration)
+    // Listen to world update events
     this->update_connection_ = event::Events::ConnectWorldUpdateBegin(
-          boost::bind(&GazeboRosAckermanDrive::UpdateChild, this));
+        boost::bind(&GazeboRosAckermanDrive::UpdateChild, this));
 }
 
 // Update the controller
@@ -326,20 +353,21 @@ void GazeboRosAckermanDrive::UpdateChild() {
     if (seconds_since_last_update > update_period_) {
         PublishOdometry(seconds_since_last_update);
 
-        // Update robot in case new velocities have been requested
         GetWheelVelocities();
+
+        double wheel_radius = this->wheel_diameter_ / 2.0;
 #if GAZEBO_MAJOR_VERSION > 2
-        joints[LEFT_FRONT]->SetParam("vel", 0, wheel_speed_[LEFT_FRONT] / (wheel_diameter_ / 2.0));
-        joints[RIGHT_FRONT]->SetParam("vel", 0, wheel_speed_[RIGHT_FRONT] / (wheel_diameter_ / 2.0));
-        joints[LEFT_REAR]->SetParam("vel", 0, wheel_speed_[LEFT_REAR] / (wheel_diameter_ / 2.0));
-        joints[RIGHT_REAR]->SetParam("vel", 0, wheel_speed_[RIGHT_REAR] / (wheel_diameter_ / 2.0));
+        joints[LEFT_FRONT]->SetParam("vel", 0, wheel_speed_[LEFT_FRONT] / wheel_radius);
+        joints[RIGHT_FRONT]->SetParam("vel", 0, wheel_speed_[RIGHT_FRONT] / wheel_radius);
+        joints[LEFT_REAR]->SetParam("vel", 0, wheel_speed_[LEFT_REAR] / wheel_radius);
+        joints[RIGHT_REAR]->SetParam("vel", 0, wheel_speed_[RIGHT_REAR] / wheel_radius);
 #else
-        joints[LEFT_FRONT]->SetVelocity(0, wheel_speed_[LEFT_FRONT] / (wheel_diameter_ / 2.0));
-        joints[RIGHT_FRONT]->SetVelocity(0, wheel_speed_[RIGHT_FRONT] / (wheel_diameter_ / 2.0));
-        joints[LEFT_REAR]->SetVelocity(0, wheel_speed_[LEFT_REAR] / (wheel_diameter_ / 2.0));
-        joints[RIGHT_REAR]->SetVelocity(0, wheel_speed_[RIGHT_REAR] / (wheel_diameter_ / 2.0));
+        joints[LEFT_FRONT]->SetVelocity(0, wheel_speed_[LEFT_FRONT] / wheel_radius);
+        joints[RIGHT_FRONT]->SetVelocity(0, wheel_speed_[RIGHT_FRONT] / wheel_radius);
+        joints[LEFT_REAR]->SetVelocity(0, wheel_speed_[LEFT_REAR] / wheel_radius);
+        joints[RIGHT_REAR]->SetVelocity(0, wheel_speed_[RIGHT_REAR] / wheel_radius);
 #endif
-        last_update_time_+= common::Time(update_period_);
+        last_update_time_ += common::Time(update_period_);
     }
 }
 
@@ -348,8 +376,12 @@ void GazeboRosAckermanDrive::FiniChild() {
     alive_ = false;
     queue_.clear();
     queue_.disable();
-    rosnode_->shutdown();
-    callback_queue_thread_.join();
+    if (rosnode_) {
+        rosnode_->shutdown();
+    }
+    if (callback_queue_thread_.joinable()) {
+        callback_queue_thread_.join();
+    }
 }
 
 void GazeboRosAckermanDrive::GetWheelVelocities() {
@@ -357,37 +389,39 @@ void GazeboRosAckermanDrive::GetWheelVelocities() {
     double vr = x_;
     double va = rot_;
     double steer_cmd;
-    double left_side_velocity  = vr;
+    double left_side_velocity = vr;
     double right_side_velocity = vr;
     double r;
-    int sig = 1;
 
-    if (fabs(va) < 1e-6) {
+    if (std::abs(va) < 1e-6) {
         r = 1e9;
         steer_cmd = 0.0;
     } else {
-        r = fabs(vr / va);
+        r = std::abs(vr / va);
         steer_cmd = std::atan(wheelbase_ / r);
     }
-    steer_cmd = va < 0 ? -1 * steer_cmd : steer_cmd;
-    if (steer_cmd > max_steer_angle_central) {
-        steer_cmd = max_steer_angle_central;
+    steer_cmd = (va < 0) ? (-1.0 * steer_cmd) : steer_cmd;
+
+    if (steer_cmd > max_steer_angle_central_) {
+        steer_cmd = max_steer_angle_central_;
     }
-    if (steer_cmd < -max_steer_angle_central) {
-        steer_cmd = -max_steer_angle_central;
+    if (steer_cmd < -max_steer_angle_central_) {
+        steer_cmd = -max_steer_angle_central_;
     }
-    sig = steer_cmd < 0 ? -1 : 1;
-    ConvertCentralAngleToLeftRight(steer_cmd, r,last_motor_cmd[1].data, last_motor_cmd[0].data);
-    if (fabs(steer_cmd) > 0){
-        double sign_vr = vr < 0 ? -1.0 : 1.0;
+
+    ConvertCentralAngleToLeftRight(steer_cmd, r, last_motor_cmd[STEER_LEFT].data, last_motor_cmd[STEER_RIGHT].data);
+
+    if (std::abs(steer_cmd) > 0) {
+        double sign_vr = (vr < 0) ? -1.0 : 1.0;
         double scale_term = va * sign_vr;
-        left_side_velocity = vr - scale_term * track_ * 0.2;
-        right_side_velocity = vr + scale_term * track_ * 0.2;
+        left_side_velocity = vr - scale_term * track_ * 0.5;
+        right_side_velocity = vr + scale_term * track_ * 0.5;
     }
-    if(vr != 0.0) {
-        wheel_speed_[RIGHT_FRONT] = right_side_velocity / fabs(std::cos(last_motor_cmd[0].data));
+
+    if (vr != 0.0) {
+        wheel_speed_[RIGHT_FRONT] = right_side_velocity / std::abs(std::cos(last_motor_cmd[STEER_RIGHT].data));
         wheel_speed_[RIGHT_REAR] = right_side_velocity;
-        wheel_speed_[LEFT_FRONT] = left_side_velocity / fabs(std::cos(last_motor_cmd[1].data));
+        wheel_speed_[LEFT_FRONT] = left_side_velocity / std::abs(std::cos(last_motor_cmd[STEER_LEFT].data));
         wheel_speed_[LEFT_REAR] = left_side_velocity;
     }
     else {
@@ -396,31 +430,28 @@ void GazeboRosAckermanDrive::GetWheelVelocities() {
         wheel_speed_[LEFT_FRONT] = 0;
         wheel_speed_[LEFT_REAR] = 0;
     }
-    motor_steer_fr_pub_.publish(last_motor_cmd[0]);
-    motor_steer_fl_pub_.publish(last_motor_cmd[1]);
+
+    motor_steer_fr_pub_.publish(last_motor_cmd[STEER_RIGHT]);
+    motor_steer_fl_pub_.publish(last_motor_cmd[STEER_LEFT]);
 }
 
-void GazeboRosAckermanDrive::ConvertCentralAngleToLeftRight(double angle,double r, double&left_angle, double& right_angle) {
-    double inner = 0;
-    double outer = 0;
+void GazeboRosAckermanDrive::ConvertCentralAngleToLeftRight(double angle, double r, double& left_angle, double& right_angle) {
     left_angle = 0.0;
     right_angle = 0.0;
 
-    if (fabs(angle) > 0) {
-        inner = fabs(std::atan2(wheelbase_, (r - track_ * 0.5)));
-        outer = fabs(std::atan2(wheelbase_, (r + track_ * 0.5)));
+    if (std::abs(angle) > 0) {
+        double inner = std::abs(std::atan2(wheelbase_, (r - track_ * 0.5)));
+        double outer = std::abs(std::atan2(wheelbase_, (r + track_ * 0.5)));
         if (angle > 0) {
-            left_angle  = inner;
+            left_angle = inner;
             right_angle = outer;
         }
         else {
-            left_angle  = -outer;
+            left_angle = -outer;
             right_angle = -inner;
         }
-        left_angle = left_angle > max_steer_angle_central ? max_steer_angle_central:
-                      (left_angle < -max_steer_angle_central? -max_steer_angle_central : left_angle);
-        right_angle = right_angle > max_steer_angle_central ? max_steer_angle_central:
-                      (right_angle < -max_steer_angle_central? -max_steer_angle_central : right_angle);
+        left_angle = std::max(-max_steer_angle_central_, std::min(max_steer_angle_central_, left_angle));
+        right_angle = std::max(-max_steer_angle_central_, std::min(max_steer_angle_central_, right_angle));
     }
 }
 
@@ -432,8 +463,7 @@ void GazeboRosAckermanDrive::CmdVelCallback(const geometry_msgs::Twist::ConstPtr
 
 void GazeboRosAckermanDrive::QueueThread() {
     static const double timeout = 0.01;
-
-    while (alive_ && rosnode_->ok()) {
+    while (alive_ && rosnode_ && rosnode_->ok()) {
         queue_.callAvailable(ros::WallDuration(timeout));
     }
 }
@@ -459,9 +489,10 @@ void GazeboRosAckermanDrive::PublishOdometry(double step_time) {
                                                                    base_footprint_frame));
     }
 
-    // publish odom topic
+    // Publish odom topic
     odom_.pose.pose.position.x = pose.Pos().X();
     odom_.pose.pose.position.y = pose.Pos().Y();
+    odom_.pose.pose.position.z = pose.Pos().Z();
 
     odom_.pose.pose.orientation.x = pose.Rot().X();
     odom_.pose.pose.orientation.y = pose.Rot().Y();
@@ -469,12 +500,11 @@ void GazeboRosAckermanDrive::PublishOdometry(double step_time) {
     odom_.pose.pose.orientation.w = pose.Rot().W();
     odom_.pose.covariance[0] = this->covariance_x_;
     odom_.pose.covariance[7] = this->covariance_y_;
-    odom_.pose.covariance[14] = 1000000000000.0;
-    odom_.pose.covariance[21] = 1000000000000.0;
-    odom_.pose.covariance[28] = 1000000000000.0;
+    odom_.pose.covariance[14] = 1e12;
+    odom_.pose.covariance[21] = 1e12;
+    odom_.pose.covariance[28] = 1e12;
     odom_.pose.covariance[35] = this->covariance_yaw_;
 
-    // get velocity in /odom frame
     ignition::math::Vector3d linear;
 #if GAZEBO_MAJOR_VERSION >= 8
     linear = this->parent->WorldLinearVel();
@@ -484,15 +514,14 @@ void GazeboRosAckermanDrive::PublishOdometry(double step_time) {
     odom_.twist.twist.angular.z = this->parent->GetWorldAngularVel().Ign().Z();
 #endif
 
-    // convert velocity to child_frame_id (aka base_footprint)
     float yaw = pose.Rot().Yaw();
     odom_.twist.twist.linear.x = cosf(yaw) * linear.X() + sinf(yaw) * linear.Y();
     odom_.twist.twist.linear.y = cosf(yaw) * linear.Y() - sinf(yaw) * linear.X();
     odom_.twist.covariance[0] = this->covariance_x_;
     odom_.twist.covariance[7] = this->covariance_y_;
-    odom_.twist.covariance[14] = 1000000000000.0;
-    odom_.twist.covariance[21] = 1000000000000.0;
-    odom_.twist.covariance[28] = 1000000000000.0;
+    odom_.twist.covariance[14] = 1e12;
+    odom_.twist.covariance[21] = 1e12;
+    odom_.twist.covariance[28] = 1e12;
     odom_.twist.covariance[35] = this->covariance_yaw_;
 
     odom_.header.stamp = current_time;

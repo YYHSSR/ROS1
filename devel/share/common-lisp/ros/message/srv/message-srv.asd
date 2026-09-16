@@ -1,1 +1,0 @@
-/home/zf/catkin_ws/devel/.private/message/share/common-lisp/ros/message/srv/message-srv.asd

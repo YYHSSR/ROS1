@@ -1,1 +1,0 @@
-/home/zf/catkin_ws/devel/.private/fkie_multimaster_msgs/share/roseus/ros/fkie_multimaster_msgs/srv/DiscoverMasters.l

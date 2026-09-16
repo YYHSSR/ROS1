@@ -1,1 +1,0 @@
-/home/zf/catkin_ws/devel/.private/message/share/gennodejs/ros/message/srv/text.js

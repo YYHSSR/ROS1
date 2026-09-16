@@ -1,1 +1,0 @@
-/home/zf/catkin_ws/devel/.private/message/lib/python3/dist-packages/message/__init__.py

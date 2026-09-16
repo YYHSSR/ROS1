@@ -2,6 +2,7 @@
 #define GAZEBO_ROS_ACKERMAN_DRIVE_H_
 
 #include <map>
+#include <string>
 
 #include <gazebo/common/common.hh>
 #include <gazebo/physics/physics.hh>
@@ -12,12 +13,10 @@
 #include <tf/transform_listener.h>
 #include <geometry_msgs/Twist.h>
 #include <nav_msgs/Odometry.h>
-#include <nav_msgs/OccupancyGrid.h>
 #include <std_msgs/Float64.h>
 
 // Custom Callback Queue
 #include <ros/callback_queue.h>
-#include <ros/advertise_options.h>
 
 // Boost
 #include <boost/thread.hpp>
@@ -25,13 +24,10 @@
 
 namespace gazebo {
 
-class Joint;
-class Entity;
-
 class GazeboRosAckermanDrive : public ModelPlugin {
 public:
     GazeboRosAckermanDrive();
-    ~GazeboRosAckermanDrive();
+    virtual ~GazeboRosAckermanDrive();
     void Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf);
 
 protected:
@@ -41,13 +37,19 @@ protected:
 private:
     void PublishOdometry(double step_time);
     void GetWheelVelocities();
-    void ConvertCentralAngleToLeftRight(double angle,double r, double& left_angle, double& right_angle);
+    void ConvertCentralAngleToLeftRight(double angle, double r, double& left_angle, double& right_angle);
     void QueueThread();
     void CmdVelCallback(const geometry_msgs::Twist::ConstPtr& cmd_msg);
 
     physics::WorldPtr world;
     physics::ModelPtr parent;
     event::ConnectionPtr update_connection_;
+
+    enum SteerIndex {
+        STEER_RIGHT = 0,
+        STEER_LEFT = 1
+    };
+
     std_msgs::Float64 last_motor_cmd[2];
     std::string left_front_joint_name_;
     std::string right_front_joint_name_;
@@ -81,9 +83,10 @@ private:
     std::string odometry_frame_;
     std::string robot_base_frame_;
 
-    static constexpr double max_steer_angle_central = 0.523598767; // ~= 30
-    static constexpr double track_ = 0.172;   // m (left right wheel distance)
-    static constexpr double wheelbase_ = 0.2; // m (front rear wheel distance)
+    // 车辆几何物理参数 (支持通过 SDF 动态配置)
+    double max_steer_angle_central_; // 最大转向角 (~30度)
+    double track_;                  // 轮距 (左右轮间距)
+    double wheelbase_;              // 轴距 (前后轮轴间距)
 
     // Custom Callback Queue
     ros::CallbackQueue queue_;

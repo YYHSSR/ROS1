@@ -1,8 +1,0 @@
-prefix=/home/zf/catkin_ws/devel/.private/fkie_master_discovery
-
-Name: fkie_master_discovery
-Description: Description of fkie_master_discovery
-Version: 1.3.2
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: fkie_multimaster_msgs std_srvs

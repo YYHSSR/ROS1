@@ -1,7 +1,13 @@
 <launch>
     <arg name="robot_namespace" default=""/>
-    <!-- 加载含有 ROS1.STL 沙盘场景的毕业设计仿真世界地图 -->
-    <arg name="world_name" default="$(find limo_gazebo_sim)/worlds/graduation.world"/>
+
+    <!-- 设置 Gazebo 模型查找路径，确保 Gazebo 能够自动解析 CAD/env-model/gazebo (行人/树木等模型) -->
+    <env name="GAZEBO_MODEL_PATH" value="$(find limo_gazebo_sim)/CAD/env-model/gazebo:$(optenv GAZEBO_MODEL_PATH)"/>
+    <!-- 禁用 Gazebo 官方在线模型库联网，避免网络超时报错并提升启动速度 -->
+    <env name="GAZEBO_MODEL_DATABASE_URI" value="http://127.0.0.1:0"/>
+
+    <!-- 加载位于 CAD/worlds 中的第5版带 4K 贴图的真实感沙盘仿真世界 -->
+    <arg name="world_name" default="$(find limo_gazebo_sim)/CAD/worlds/ros_sandbox_simulation.world"/>
     <arg name="gui" default="true"/>
 
     <!-- 启动 Gazebo 仿真环境 -->
@@ -18,10 +24,11 @@
     <!-- 加载阿克曼 (Ackermann) 驱动模型 URDF/Xacro 描述文件 -->
     <param name="robot_description" command="$(find xacro)/xacro '$(find limo_gazebo_sim)/urdf/limo_ackerman.xacro' robot_namespace:=$(arg robot_namespace)" />
 
-    <!-- 阿克曼小车在毕业设计场景中的初始生成位姿 -->
-    <arg name="x" default="0.0"/>
-    <arg name="y" default="0.0"/>
-    <arg name="z" default="0.08"/>
+    <!-- 阿克曼小车在仿真沙盘中的初始生成位姿 (适应 2.5 倍扩大后的路面基准) -->
+    <!-- 默认放置在直道路面起点 (x=2.5, y=1.0, z=0.15)；若放置在启停槽位可传参 x:=5.0 y:=-1.0 yaw:=1.57 -->
+    <arg name="x" default="2.5"/>
+    <arg name="y" default="1.0"/>
+    <arg name="z" default="0.15"/>
     <arg name="yaw" default="0.0"/>
 
     <!-- 在 Gazebo 中生成阿克曼小车模型 -->

@@ -1,2 +1,16 @@
-.catkin_workspace
+# Build and runtime outputs
+build/
+devel/
+logs/
+.catkin_tools/
+
+# Python cache
 *.pyc
+__pycache__/
+*.pyo
+
+# Editor and temporary files
+*.backup
+*~
+*.swp
+.DS_Store

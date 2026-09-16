@@ -1,7 +1,0 @@
-multimaster_fkie/fkie_master_discovery
-/home/zf/catkin_ws/devel/.private/fkie_master_discovery/share/fkie_master_discovery/cmake/fkie_master_discoveryConfig.cmake /home/zf/catkin_ws/devel/share/fkie_master_discovery/cmake/fkie_master_discoveryConfig.cmake
-/home/zf/catkin_ws/devel/.private/fkie_master_discovery/share/fkie_master_discovery/cmake/fkie_master_discoveryConfig-version.cmake /home/zf/catkin_ws/devel/share/fkie_master_discovery/cmake/fkie_master_discoveryConfig-version.cmake
-/home/zf/catkin_ws/devel/.private/fkie_master_discovery/lib/fkie_master_discovery/zeroconf /home/zf/catkin_ws/devel/lib/fkie_master_discovery/zeroconf
-/home/zf/catkin_ws/devel/.private/fkie_master_discovery/lib/fkie_master_discovery/master_discovery /home/zf/catkin_ws/devel/lib/fkie_master_discovery/master_discovery
-/home/zf/catkin_ws/devel/.private/fkie_master_discovery/lib/python3/dist-packages/fkie_master_discovery/__init__.py /home/zf/catkin_ws/devel/lib/python3/dist-packages/fkie_master_discovery/__init__.py
-/home/zf/catkin_ws/devel/.private/fkie_master_discovery/lib/pkgconfig/fkie_master_discovery.pc /home/zf/catkin_ws/devel/lib/pkgconfig/fkie_master_discovery.pc
