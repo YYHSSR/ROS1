@@ -29,7 +29,7 @@
     <arg name="x" default="2.5"/>
     <arg name="y" default="1.0"/>
     <arg name="z" default="0.15"/>
-    <arg name="yaw" default="0.0"/>
+    <arg name="yaw" default="1.57"/>
 
     <!-- 在 Gazebo 中生成阿克曼小车模型 -->
     <node name="spawn_limo_model" pkg="gazebo_ros" type="spawn_model" args="-x $(arg x)
@@ -54,4 +54,18 @@
 
     <!-- 启动 RViz 可视化界面 -->
     <node name="rviz" pkg="rviz" type="rviz" args="-d $(find limo_gazebo_sim)/rviz/robot.rviz" />
+
+    <!-- 动态白天日光与移动物理阴影控制器: 恒定维持明亮白天，太阳方位角与高度角持续平滑微动，阴影旋转伸缩 -->
+    <arg name="dynamic_sun" default="true" doc="是否启用白天动态光照与物理阴影转动系统"/>
+    <group if="$(arg dynamic_sun)">
+        <node name="dynamic_sun_controller" pkg="limo_gazebo_sim" type="dynamic_sun.py" output="screen">
+            <!-- 太阳旋转一周的周期 (秒，默认 120 秒循环一次) -->
+            <param name="cycle_period" value="120.0" />
+            <!-- 最低高度角 35 度，确保永远处于明亮白天，视觉算法不失效 -->
+            <param name="min_elevation_deg" value="35.0" />
+            <!-- 最高高度角 75 度，正午短阴影 -->
+            <param name="max_elevation_deg" value="75.0" />
+            <param name="update_rate" value="10.0" />
+        </node>
+    </group>
 </launch>
