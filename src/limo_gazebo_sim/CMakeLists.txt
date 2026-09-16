@@ -29,14 +29,12 @@ include_directories(
 add_library(gazebo_ros_ackerman src/gazebo_ros_ackerman_drive.cpp)
 target_link_libraries(gazebo_ros_ackerman ${catkin_LIBRARIES} ${Boost_LIBRARIES})
 
-install(TARGETS gazebo_ros_ackerman
+add_library(gazebo_dynamic_sun src/gazebo_dynamic_sun.cpp)
+target_link_libraries(gazebo_dynamic_sun ${catkin_LIBRARIES} ${Boost_LIBRARIES})
+
+install(TARGETS gazebo_ros_ackerman gazebo_dynamic_sun
 ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
-)
-
-catkin_install_python(PROGRAMS
-  scripts/dynamic_sun.py
-  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

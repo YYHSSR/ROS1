@@ -1,8 +1,9 @@
 <launch>
     <arg name="robot_namespace" default=""/>
 
-    <!-- 设置 Gazebo 模型查找路径，确保 Gazebo 能够自动解析 CAD/env-model/gazebo (行人/树木等模型) -->
+    <!-- 设置 Gazebo 模型与世界插件查找路径 -->
     <env name="GAZEBO_MODEL_PATH" value="$(find limo_gazebo_sim)/CAD/env-model/gazebo:$(optenv GAZEBO_MODEL_PATH)"/>
+    <env name="GAZEBO_PLUGIN_PATH" value="$(find limo_gazebo_sim)/../../devel/lib:$(optenv GAZEBO_PLUGIN_PATH)"/>
     <!-- 禁用 Gazebo 官方在线模型库联网，避免网络超时报错并提升启动速度 -->
     <env name="GAZEBO_MODEL_DATABASE_URI" value="http://127.0.0.1:0"/>
 
@@ -54,18 +55,4 @@
 
     <!-- 启动 RViz 可视化界面 -->
     <node name="rviz" pkg="rviz" type="rviz" args="-d $(find limo_gazebo_sim)/rviz/robot.rviz" />
-
-    <!-- 动态白天日光与移动物理阴影控制器: 恒定维持明亮白天，太阳方位角与高度角持续平滑微动，阴影旋转伸缩 -->
-    <arg name="dynamic_sun" default="true" doc="是否启用白天动态光照与物理阴影转动系统"/>
-    <group if="$(arg dynamic_sun)">
-        <node name="dynamic_sun_controller" pkg="limo_gazebo_sim" type="dynamic_sun.py" output="screen">
-            <!-- 太阳旋转一周的周期 (秒，默认 120 秒循环一次) -->
-            <param name="cycle_period" value="120.0" />
-            <!-- 最低高度角 35 度，确保永远处于明亮白天，视觉算法不失效 -->
-            <param name="min_elevation_deg" value="35.0" />
-            <!-- 最高高度角 75 度，正午短阴影 -->
-            <param name="max_elevation_deg" value="75.0" />
-            <param name="update_rate" value="10.0" />
-        </node>
-    </group>
 </launch>

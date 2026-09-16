@@ -34,6 +34,14 @@
       </attenuation>
       <direction>-0.3 0.4 -1.0</direction>
     </light>
+
+    <!-- 原生白天动态光照与平滑移动阴影世界插件: 嵌入世界内部，自动驱动太阳方位角与高度角，绝不进入黑夜 -->
+    <plugin name="dynamic_sun" filename="libgazebo_dynamic_sun.so">
+      <cycle_period>120.0</cycle_period>
+      <min_elevation>35.0</min_elevation>
+      <max_elevation>75.0</max_elevation>
+      <light_name>sun</light_name>
+    </plugin>
     <model name="background_ground"><static>true</static><pose>0 0 -0.02 0 0 0</pose><link name="ground"><collision name="ground_collision"><geometry><plane><normal>0 0 1</normal><size>100 100</size></plane></geometry></collision><visual name="ground_visual"><geometry><plane><normal>0 0 1</normal><size>100 100</size></plane></geometry><material><ambient>0.3 0.33 0.35 1</ambient><diffuse>0.3 0.33 0.35 1</diffuse></material></visual></link></model>
     <model name="ros_sandbox">
       <static>true</static>
