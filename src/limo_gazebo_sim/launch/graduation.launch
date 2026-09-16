@@ -25,12 +25,12 @@
     <!-- 加载阿克曼 (Ackermann) 驱动模型 URDF/Xacro 描述文件 -->
     <param name="robot_description" command="$(find xacro)/xacro '$(find limo_gazebo_sim)/urdf/limo_ackerman.xacro' robot_namespace:=$(arg robot_namespace)" />
 
-    <!-- 阿克曼小车在仿真沙盘中的初始生成位姿 (适应 2.5 倍扩大后的路面基准) -->
-    <!-- 默认放置在直道路面起点 (x=2.5, y=1.0, z=0.15)；若放置在启停槽位可传参 x:=5.0 y:=-1.0 yaw:=1.57 -->
-    <arg name="x" default="2.5"/>
-    <arg name="y" default="1.0"/>
+    <!-- 阿克曼小车在仿真沙盘中的初始生成位姿 (适应沙盘居中到网格原点后的坐标变换) -->
+    <!-- 默认放置在直道路面起点 (x=-1.5, y=-3.0, z=0.15)；若放置在启停槽位可传参 x:=1.0 y:=-5.0 yaw:=1.57 -->
+    <arg name="x" default="-1.5"/>
+    <arg name="y" default="-3.0"/>
     <arg name="z" default="0.15"/>
-    <arg name="yaw" default="0.785"/>
+    <arg name="yaw" default="-1.57"/>
 
     <!-- 在 Gazebo 中生成阿克曼小车模型 -->
     <node name="spawn_limo_model" pkg="gazebo_ros" type="spawn_model" args="-x $(arg x)

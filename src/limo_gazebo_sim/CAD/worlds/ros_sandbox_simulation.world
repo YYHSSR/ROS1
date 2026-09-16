@@ -11,29 +11,19 @@
 
     <!-- 场景配置: 白天环境光与实时物理阴影 (去除 SkyX 云渲染以保障帧率) -->
     <scene>
-      <ambient>0.55 0.55 0.55 1.0</ambient>
+      <ambient>0.45 0.45 0.45 1.0</ambient>
       <background>0.53 0.68 0.85 1.0</background>
       <shadows>true</shadows>
     </scene>
 
-    <!-- 太阳主光源: 上午 10:30 自然斜射日光角度，在路面与小车上产生清晰实时阴影
-         方向矢量: azimuth≈NW, elevation≈50° (dz=-0.77, |dxy|≈0.64)
-         车辆行驶时阴影随车体位姿逐帧实时变形，无需移动太阳 -->
+    <!-- 太阳主光源: 上午自然斜射日光角度，在路面与小车上产生清晰立体动态阴影
+         方向矢量: azimuth≈NW, elevation≈50° (dz=-0.77, |dxy|≈0.64) -->
     <light name="sun" type="directional">
       <cast_shadows>true</cast_shadows>
       <pose>0 0 50 0 0 0</pose>
       <diffuse>0.95 0.93 0.88 1.0</diffuse>
       <specular>0.15 0.15 0.15 1.0</specular>
       <direction>-0.45 0.45 -0.77</direction>
-    </light>
-
-    <!-- 环境补光: 模拟天空散射，填充背阴面避免死黑 -->
-    <light name="sky_fill" type="directional">
-      <cast_shadows>false</cast_shadows>
-      <pose>0 0 30 0 0 0</pose>
-      <diffuse>0.25 0.30 0.38 1.0</diffuse>
-      <specular>0 0 0 1</specular>
-      <direction>0.1 -0.1 -1.0</direction>
     </light>
 
     <!-- 动态日光插件: 每 10 真实秒更新一次太阳方位角，障碍物阴影缓慢移动
@@ -47,20 +37,33 @@
       <light_name>sun</light_name>
     </plugin>
 
-    <!-- 真实感沙盘环境: 2.5 倍等比缩放的高精路面与障碍物 -->
+    <!-- 真实感沙盘环境: 2.5 倍等比缩放的高精路面与障碍物 (居中放置在 Gazebo 网格原点) -->
     <model name="ros_sandbox">
       <static>true</static>
-      <pose>0 0 0 0 0 0</pose>
+      <pose>-4.0 -4.0 0 0 0 0</pose>
       <link name="sandbox_environment">
-        <visual name="textured_environment">
+        <!-- 1. 地面与路面 (接收动态阴影，关闭自投射以实现障碍物阴影投射并极大提升渲染性能) -->
+        <visual name="ground_visual">
           <geometry>
             <mesh>
-              <uri>file:///home/zf/catkin_ws/src/limo_gazebo_sim/CAD/meshes/ros_sandbox_visual.obj</uri>
+              <uri>file:///home/zf/catkin_ws/src/limo_gazebo_sim/CAD/meshes/ros_sandbox_ground.obj</uri>
+              <scale>2.5 2.5 2.5</scale>
+            </mesh>
+          </geometry>
+          <cast_shadows>false</cast_shadows>
+        </visual>
+
+        <!-- 2. 障碍物、建筑、树木、围墙与平台 (投射清晰真实的三维动态阴影到路面) -->
+        <visual name="obstacles_visual">
+          <geometry>
+            <mesh>
+              <uri>file:///home/zf/catkin_ws/src/limo_gazebo_sim/CAD/meshes/ros_sandbox_obstacles.obj</uri>
               <scale>2.5 2.5 2.5</scale>
             </mesh>
           </geometry>
           <cast_shadows>true</cast_shadows>
         </visual>
+
         <collision name="environment_collision">
           <geometry>
             <mesh>
@@ -80,10 +83,10 @@
       </link>
     </model>
 
-    <!-- 俯瞰观察摄像机初始位姿 -->
+    <!-- 俯瞰观察摄像机初始位姿: 瞄准沙盘中心 (0, 0, 0) -->
     <gui fullscreen="0">
       <camera name="sandbox_overview">
-        <pose>17.5 -15 17.5 0 0.65 2.17</pose>
+        <pose>13.5 -19.0 17.5 0 0.65 2.17</pose>
         <view_controller>orbit</view_controller>
       </camera>
     </gui>
