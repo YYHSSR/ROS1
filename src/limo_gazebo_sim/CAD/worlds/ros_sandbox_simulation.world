@@ -2,48 +2,41 @@
 <sdf version="1.6">
   <world name="ros_sandbox_world">
     <gravity>0 0 -9.81</gravity>
-    
+
+    <!-- 物理引擎配置: ODE 1ms 步长，满帧实时更新 -->
     <physics name="ode_physics" type="ode">
       <max_step_size>0.001</max_step_size>
       <real_time_update_rate>1000</real_time_update_rate>
     </physics>
 
-    <!-- 动态白天光照与自然昼夜天空系统: 正午(12:00)日照、自然动态流云与实时阴影 -->
+    <!-- 场景配置: 白天环境光与实时物理阴影 (去除 SkyX 云渲染以保障帧率) -->
     <scene>
-      <sky>
-        <time>12.0</time>
-        <sunrise>6.0</sunrise>
-        <sunset>18.0</sunset>
-        <clouds>
-          <speed>12</speed>
-          <humidity>0.3</humidity>
-          <mean>0.4</mean>
-        </clouds>
-      </sky>
-      <ambient>0.6 0.6 0.6 1.0</ambient>
-      <background>0.7 0.8 0.9 1.0</background>
+      <ambient>0.55 0.55 0.55 1.0</ambient>
+      <background>0.53 0.68 0.85 1.0</background>
       <shadows>true</shadows>
     </scene>
 
-    <!-- 太阳主光源: 自然直射日光，投射高精度动态阴影 (平行定向光，去除点光源衰减冗余) -->
+    <!-- 太阳主光源: 上午 10:30 自然斜射日光角度，在路面与小车上产生清晰实时阴影
+         方向矢量: azimuth≈NW, elevation≈50° (dz=-0.77, |dxy|≈0.64)
+         车辆行驶时阴影随车体位姿逐帧实时变形，无需移动太阳 -->
     <light name="sun" type="directional">
       <cast_shadows>true</cast_shadows>
-      <pose>0 0 20 0 0 0</pose>
-      <diffuse>0.9 0.9 0.9 1.0</diffuse>
-      <specular>0.2 0.2 0.2 1.0</specular>
-      <direction>-0.3 0.4 -1.0</direction>
+      <pose>0 0 50 0 0 0</pose>
+      <diffuse>0.95 0.93 0.88 1.0</diffuse>
+      <specular>0.15 0.15 0.15 1.0</specular>
+      <direction>-0.45 0.45 -0.77</direction>
     </light>
 
-    <!-- 原生白天动态光照与平滑移动阴影世界插件: 嵌入世界内部，自动驱动太阳方位角与高度角，绝不进入黑夜 -->
-    <plugin name="dynamic_sun" filename="libgazebo_dynamic_sun.so">
-      <cycle_period>180.0</cycle_period>
-      <min_elevation>35.0</min_elevation>
-      <max_elevation>75.0</max_elevation>
-      <update_interval>0.2</update_interval>
-      <light_name>sun</light_name>
-    </plugin>
+    <!-- 环境补光: 模拟天空散射，填充背阴面避免死黑 -->
+    <light name="sky_fill" type="directional">
+      <cast_shadows>false</cast_shadows>
+      <pose>0 0 30 0 0 0</pose>
+      <diffuse>0.25 0.30 0.38 1.0</diffuse>
+      <specular>0 0 0 1</specular>
+      <direction>0.1 -0.1 -1.0</direction>
+    </light>
 
-    <!-- 真实感沙盘环境: 2.5倍等比缩放的高精路面与障碍物模型 (去除底部多余的重叠基底地面) -->
+    <!-- 真实感沙盘环境: 2.5 倍等比缩放的高精路面与障碍物 -->
     <model name="ros_sandbox">
       <static>true</static>
       <pose>0 0 0 0 0 0</pose>
