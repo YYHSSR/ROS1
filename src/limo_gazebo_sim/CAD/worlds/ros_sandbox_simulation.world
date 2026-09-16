@@ -33,7 +33,7 @@
       <cycle_period>180.0</cycle_period>
       <min_elevation>35.0</min_elevation>
       <max_elevation>75.0</max_elevation>
-      <update_interval>7.0</update_interval>
+      <update_interval>5.0</update_interval>
       <light_name>sun</light_name>
     </plugin>
 
