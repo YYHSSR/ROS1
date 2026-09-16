@@ -26,14 +26,14 @@
       <direction>-0.45 0.45 -0.77</direction>
     </light>
 
-    <!-- 动态日光插件: 每 10 真实秒更新一次太阳方位角，障碍物阴影缓慢移动
-         update_interval=10.0 → 0.1Hz → 阴影贴图重建仅占 GPU ~1%，帧率无感知影响
+    <!-- 动态日光插件: 每 7 真实秒更新一次太阳方位角，障碍物阴影缓慢平滑移动
+         update_interval=7.0 → 阴影贴图重建开销极低，帧率稳定无卡顿
          cycle_period=180s → 3分钟完成一次完整方位角旋转，白天仰角始终 35°~75° -->
     <plugin name="dynamic_sun" filename="libgazebo_dynamic_sun.so">
       <cycle_period>180.0</cycle_period>
       <min_elevation>35.0</min_elevation>
       <max_elevation>75.0</max_elevation>
-      <update_interval>10.0</update_interval>
+      <update_interval>7.0</update_interval>
       <light_name>sun</light_name>
     </plugin>
 
