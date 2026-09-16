@@ -30,7 +30,7 @@
     <arg name="x" default="2.5"/>
     <arg name="y" default="1.0"/>
     <arg name="z" default="0.15"/>
-    <arg name="yaw" default="1.57"/>
+    <arg name="yaw" default="0.785"/>
 
     <!-- 在 Gazebo 中生成阿克曼小车模型 -->
     <node name="spawn_limo_model" pkg="gazebo_ros" type="spawn_model" args="-x $(arg x)
