@@ -7,7 +7,7 @@
     <!-- 禁用 Gazebo 官方在线模型库联网，避免网络超时报错并提升启动速度 -->
     <env name="GAZEBO_MODEL_DATABASE_URI" value="http://127.0.0.1:0"/>
 
-    <!-- 加载位于 CAD/worlds 中的第5版带 4K 贴图的真实感沙盘仿真世界 -->
+    <!-- 加载位于 CAD/worlds 中的第6版带 4K 贴图的真实感沙盘仿真世界 -->
     <arg name="world_name" default="$(find limo_gazebo_sim)/CAD/worlds/ros_sandbox_simulation.world"/>
     <arg name="gui" default="true"/>
 
@@ -30,7 +30,7 @@
     <arg name="x" default="-1.5"/>
     <arg name="y" default="-3.0"/>
     <arg name="z" default="0.15"/>
-    <arg name="yaw" default="-1.57"/>
+    <arg name="yaw" default="3.14"/>
 
     <!-- 在 Gazebo 中生成阿克曼小车模型 -->
     <node name="spawn_limo_model" pkg="gazebo_ros" type="spawn_model" args="-x $(arg x)
