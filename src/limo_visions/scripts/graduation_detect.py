@@ -5,7 +5,7 @@
 ================================================================================
 项目名称: LIMO 智能车自动驾驶 - 工业级高精度车道线感知与几何解算节点
 源文件名: graduation_detect.py
-代码定位: 纯感知解耦节点 (订阅相机影像 -> 解算车道线物理特征 -> 输出控制偏差与全中文HUD)
+代码定位: 纯感知解耦节点 (订阅相机影像 -> 解算车道线物理特征 -> 输出控制偏差与车道线二值图)
 下游节点: graduation_control.py (斯坦利几何循迹控制器)
 ================================================================================
 
@@ -38,10 +38,9 @@
          - 5.4 物理道路几何曲率 kappa (1/m) 解算
          - 5.5 时序一阶低通滤波平滑与断线容错保护 (容忍连续 6 帧丢失)
 
-【阶段六】ROS 接口通信与全中文 HUD 调试监控 (Publication & Chinese HUD OSD)
+【阶段六】ROS 接口通信发布 (Publication & Data Contract)
          - 6.1 发布 /lane_detect_pose: 输出全维度物理与几何参数 (供下游控制器订阅)
          - 6.2 发布 /lane_detect_image: 输出二值化车道线分割掩膜
-         - 6.3 渲染发布 /lane_detect_debug: 高清全中文多级 HUD 状态监控仪表盘
 ================================================================================
 """
 
@@ -49,7 +48,6 @@ import warnings
 import rospy
 import cv2
 import numpy as np
-from PIL import Image as PILImage, ImageDraw, ImageFont
 from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import Pose
@@ -71,26 +69,24 @@ class AutonomousLaneDetector:
         ========================================================================
         """
         # ----------------------------------------------------------------------
-        # [配置 1/8] ROS 话题通信发布者接口初始化
+        # [配置 1/7] ROS 话题通信发布者接口初始化
         # ----------------------------------------------------------------------
         # 发布二值化车道线掩膜 (mono8 格式)
         self.image_pub = rospy.Publisher("/lane_detect_image", Image, queue_size=1)
         # 发布车道线位姿与几何物理契约消息 (Pose 格式，供下游 graduation_control.py 订阅)
         self.target_pub = rospy.Publisher("/lane_detect_pose", Pose, queue_size=1)
-        # 发布包含滑动窗口、动态 ROI 与多级全中文 HUD 的调试图像 (bgr8 格式)
-        self.debug_pub = rospy.Publisher("/lane_detect_debug", Image, queue_size=1)
 
         self.bridge = CvBridge()
 
         # ----------------------------------------------------------------------
-        # [配置 2/8] ROS 参数服务器载入 (纯感知参数，与控制算法彻底解耦)
+        # [配置 2/7] ROS 参数服务器载入 (纯感知参数，与控制算法彻底解耦)
         # ----------------------------------------------------------------------
         image_topic = rospy.get_param("~image_topic", "/color/image_raw")
         # 期望车辆相对于左侧黄色基准车道线的物理横向距离 (米), 默认 0.45m
         self.target_lane_offset = rospy.get_param("~target_lane_offset", 0.45)
 
         # ----------------------------------------------------------------------
-        # [配置 3/8] 相机空间内参与安装物理外参 (对应阶段三: 逆透视几何映射 IPM)
+        # [配置 3/7] 相机空间内参与安装物理外参 (对应阶段三: 逆透视几何映射 IPM)
         # 来源于 LIMO 仿真模型与相机标定话题 /camera_info
         # ----------------------------------------------------------------------
         self.fx = 381.36           # 相机水平焦距 (px)
@@ -102,7 +98,7 @@ class AutonomousLaneDetector:
         self.x_cam_offset = 0.185  # 相机光心相对于小车底盘回转中心的前向偏置 (m)
 
         # ----------------------------------------------------------------------
-        # [配置 4/8] 形态学运算核与自适应 Gamma 逆拉伸查找表 (对应阶段一)
+        # [配置 4/7] 形态学运算核与自适应 Gamma 逆拉伸查找表 (对应阶段一)
         # ----------------------------------------------------------------------
         # 开运算形态学核: 3x3 矩形核，滤除微光极暗环境下的细碎离群噪斑
         self.kernel_open = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
@@ -115,33 +111,21 @@ class AutonomousLaneDetector:
             self.gamma_lut[g] = np.array([((i / 255.0) ** g) * 255 for i in range(256)]).astype('uint8')
 
         # ----------------------------------------------------------------------
-        # [配置 5/8] 全中文 HUD 字体引擎初始化 (对应阶段六: 可视化监控)
-        # 采用系统预装开源 Noto Sans CJK 高清黑体，支持无锯齿多级中文渲染
-        # ----------------------------------------------------------------------
-        font_path = "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"
-        try:
-            self.font_zh = ImageFont.truetype(font_path, 13)
-            self.font_large = ImageFont.truetype(font_path, 14)
-            self.has_zh_font = True
-        except Exception:
-            self.has_zh_font = False
-
-        # ----------------------------------------------------------------------
-        # [配置 6/8] 垂直自适应滑动窗口算法参数 (对应阶段二)
+        # [配置 5/7] 垂直自适应滑动窗口算法参数 (对应阶段二)
         # ----------------------------------------------------------------------
         self.nwindows = 9          # 纵向滑动窗口数量 (覆盖 180~475px 广阔纵深视锥)
         self.window_margin = 65    # 单个窗口单侧水平半宽 (px, 65px 保障急弯处稳健连贯跟踪)
         self.min_recenter_pix = 15 # 触发当前窗口中心向内点均值重定位的最小像素数阈值
 
         # ----------------------------------------------------------------------
-        # [配置 7/8] 轨迹引导动态 ROI 与 RANSAC 状态量 (对应阶段一与阶段四)
+        # [配置 6/7] 轨迹引导动态 ROI 与 RANSAC 状态量 (对应阶段一与阶段四)
         # ----------------------------------------------------------------------
         self.dynamic_x_max = 400   # 严格锁定左侧道路线视场 (0 ~ 400px)，杜绝远端杂散干扰
         self.dynamic_roi_poly = None # 当前动态 ROI 多边形顶点数组
         self.ransac_inlier_ratio = 1.0 # 当前帧 RANSAC 拟合内点纯度 (0.0 ~ 1.0)
 
         # ----------------------------------------------------------------------
-        # [配置 8/8] 时序历史记忆与滤波状态量 (对应阶段五: 防丢线与时空滤波)
+        # [配置 7/7] 时序历史记忆与滤波状态量 (对应阶段五: 防丢线与时空滤波)
         # ----------------------------------------------------------------------
         self.last_fit_metric = None    # 上一有效帧底盘米制多项式拟合系数
         self.last_valid_x_px = 100.0   # 上一有效帧车道线底部引导像素横坐标 (px)
@@ -439,7 +423,7 @@ class AutonomousLaneDetector:
             ratio = float(best_count) / float(n_pts)
             return final_coeffs, ratio
         else:
-            # 保底回退机制
+            # [步骤 4.3] 保底回退机制 (退化为全局最小二乘拟合)
             return self._safe_polyfit(bx, by, degree), 1.0
 
     def compute_metric_and_control(self, inlier_x, inlier_y, mask=None):
@@ -470,7 +454,7 @@ class AutonomousLaneDetector:
         num_pts = len(inlier_x)
         fit_ok = False
 
-        # [步骤 5.0] 计算横向道路线位置 (纵向参考 center_y) 与全局像素量 (与 detect_lane_contest.py 保持一致)
+        # [步骤 5.1] 计算横向道路线位置 (纵向参考 center_y) 与全局像素量 (与 detect_lane_contest.py 保持一致)
         if mask is not None:
             color_y = mask[360:460, 250:350]
             white_count_y = np.sum(color_y == 255)
@@ -484,7 +468,7 @@ class AutonomousLaneDetector:
             center_y = 240.0
             white_count_sum = num_pts
 
-        # [步骤 5.1] 采样 row 320 近场引导，严格锁定左侧车道线 (0 <= X <= 400)
+        # [步骤 5.2] 采样 row 320 近场引导，严格锁定左侧车道线 (0 <= X <= 400)
         # 应对虚线间隙（主要检测 320 行，如在间隙依次检查邻近行，杜绝远端 180px 弯道均值导致过早转弯）
         center_x_px = -1.0
         if mask is not None:
@@ -506,7 +490,7 @@ class AutonomousLaneDetector:
         else:
             self.lost_frame_count += 1
 
-        # [步骤 5.2] 滤除超出左侧 ROI 边界的杂散边缘噪点并拟合米制底盘多项式
+        # [步骤 5.3] 滤除超出左侧 ROI 边界的杂散边缘噪点并拟合米制底盘多项式
         valid_body = []
         if num_pts >= 25:
             valid_mask = (inlier_x >= 10) & (inlier_x <= 400) & (inlier_y >= 240)
@@ -546,6 +530,7 @@ class AutonomousLaneDetector:
         if self.last_fit_metric is None or center_x_px < 0:
             return center_x_px, center_y, white_count_sum, None, 0.0, 0.0, 0.0, 0.65, False
 
+        # [步骤 5.4] 动态前瞻距离、横向偏差 e_y、航向角偏差 e_psi 与道路曲率解算
         fit_metric = self.last_fit_metric
         bx_min = float(np.min(bx)) if len(valid_body) > 0 else 0.50
         bx_max = float(np.max(bx)) if len(valid_body) > 0 else 1.20
@@ -564,6 +549,7 @@ class AutonomousLaneDetector:
             tangent_slope = fit_metric[0]
             curvature = 0.0
 
+        # [步骤 5.5] 航向角一阶低通滤波平滑与状态返回
         e_y = float(y_lane_metric - self.target_lane_offset)
         e_psi = float(np.arctan(tangent_slope))
         self.last_heading = 0.75 * e_psi + 0.25 * self.last_heading
@@ -578,12 +564,11 @@ class AutonomousLaneDetector:
         ========================================================================
         【主回调函数】相机图像订阅回调主循环 (Main Sensor Pipeline Dispatcher)
         【流水线全流程】:
-           [流水线 1/6] 阶段一: 提取车道线抗光照二值掩膜 (extract_features)
-           [流水线 2/6] 阶段二: 垂直滑动窗口连续追踪聚类 (sliding_window_tracking)
-           [流水线 3/6] 阶段三~五: IPM米制映射、RANSAC拟合与几何指标解算 (compute_lane_metrics)
-           [流水线 4/6] 阶段六.1: 发布车道线感知全息数据 (/lane_detect_pose)
-           [流水线 5/6] 阶段六.2: 发布二值化车道线图 (/lane_detect_image)
-           [流水线 6/6] 阶段六.3: 渲染并发布全中文 HUD 调试监控图 (/lane_detect_debug)
+           [流水线 1/5] 阶段一: 提取车道线抗光照二值掩膜 (extract_features)
+           [流水线 2/5] 阶段二: 垂直滑动窗口连续追踪聚类 (sliding_window_tracking)
+           [流水线 3/5] 阶段三~五: IPM米制映射、RANSAC拟合与几何指标解算 (compute_lane_metrics)
+           [流水线 4/5] 阶段六.1: 发布车道线感知全息数据 (/lane_detect_pose)
+           [流水线 5/5] 阶段六.2: 发布二值化车道线图 (/lane_detect_image)
         ========================================================================
         """
         try:
@@ -593,23 +578,23 @@ class AutonomousLaneDetector:
             return
 
         # ----------------------------------------------------------------------
-        # [流水线 1/6] 阶段一: 图像光度自适应、特征融合与动态 ROI 裁切
+        # [流水线 1/5] 阶段一: 图像光度自适应、特征融合与动态 ROI 裁切
         # ----------------------------------------------------------------------
         mask, mean_l, gamma, scene_mode = self.extract_features(cv_image)
 
         # ----------------------------------------------------------------------
-        # [流水线 2/6] 阶段二: 垂直自适应滑动窗口路径追踪
+        # [流水线 2/5] 阶段二: 垂直自适应滑动窗口路径追踪
         # ----------------------------------------------------------------------
         inlier_x, inlier_y, window_boxes = self.sliding_window_tracking(mask)
 
         # ----------------------------------------------------------------------
-        # [流水线 3/6] 阶段三~五: 物理 IPM 映射、RANSAC 拟合与核心几何指标解算
+        # [流水线 3/5] 阶段三~五: 物理 IPM 映射、RANSAC 拟合与核心几何指标解算
         # ----------------------------------------------------------------------
         (center_x, center_y, num_pts, fit_metric,
          e_y, e_psi, curvature, lookahead_dist, fit_ok) = self.compute_metric_and_control(inlier_x, inlier_y, mask)
 
         # ----------------------------------------------------------------------
-        # [流水线 4/6] 阶段六.1: 发布车道线位姿与几何物理数据契约 (/lane_detect_pose)
+        # [流水线 4/5] 阶段六.1: 发布车道线位姿与几何物理数据契约 (/lane_detect_pose)
         # 字段映射表 (与下游 graduation_control.py 严格匹配对照):
         #   position.x    : 引导点像素水平坐标 (px, -1 表示丢线断线)
         #   position.y    : 动态自适应 ROI 右边界当前像素宽度 (px: 390 ~ 625)
@@ -630,63 +615,12 @@ class AutonomousLaneDetector:
         self.target_pub.publish(objPose)
 
         # ----------------------------------------------------------------------
-        # [流水线 5/6] 阶段六.2: 发布二值化分割图像 (/lane_detect_image)
+        # [流水线 5/5] 阶段六.2: 发布二值化分割图像 (/lane_detect_image)
         # ----------------------------------------------------------------------
         try:
             self.image_pub.publish(self.bridge.cv2_to_imgmsg(mask, "mono8"))
         except CvBridgeError:
             pass
-
-        # ----------------------------------------------------------------------
-        # [流水线 6/6] 阶段六.3: 渲染并发布全中文 HUD 调试监控图 (/lane_detect_debug)
-        # ----------------------------------------------------------------------
-        if self.debug_pub.get_num_connections() > 0:
-            debug_img = cv_image.copy()
-
-            # 绘制动态 ROI 轨迹引导多边形边缘 (半透明青绿色多边形)
-            if self.dynamic_roi_poly is not None:
-                cv2.polylines(debug_img, [self.dynamic_roi_poly], True, (0, 220, 150), 1, cv2.LINE_AA)
-
-            # 绘制滑动窗口搜索边界框 (青色矩形框)
-            for box in window_boxes:
-                cv2.rectangle(debug_img, box[0], box[1], (255, 255, 0), 1)
-
-            # 绘制动态前瞻目标采样引导参考点 (红色实心圆)
-            if center_x != -1:
-                cv2.circle(debug_img, (int(center_x), 320), 7, (0, 0, 255), -1)
-
-            # 绘制全中文 OSD 仪表盘半透明磨砂背景底板
-            overlay = debug_img.copy()
-            cv2.rectangle(overlay, (5, 5), (380, 132), (0, 0, 0), -1)
-            cv2.addWeighted(overlay, 0.70, debug_img, 0.30, 0, debug_img)
-
-            # 多级全中文 HUD 信息卡片渲染 (基于系统开源 Noto Sans CJK 字体引擎)
-            if self.has_zh_font:
-                pil_img = PILImage.fromarray(cv2.cvtColor(debug_img, cv2.COLOR_BGR2RGB))
-                draw = ImageDraw.Draw(pil_img)
-
-                # 追踪状态标签
-                status_text = "系统状态: 稳定追踪 (精准锁定)" if fit_ok else "系统状态: 触发断线保护 (沿用历史)"
-                status_color = (0, 255, 100) if fit_ok else (255, 120, 0)
-
-                # 逐行绘制多级全中文感知监控参数
-                draw.text((12, 8), "环境光照: %s" % scene_mode, font=self.font_large, fill=(255, 255, 255))
-                draw.text((12, 28), "路面照度: %.1f | 逆Gamma: %.2f | 动态ROI界: %d" % (mean_l, gamma, self.dynamic_x_max), font=self.font_zh, fill=(210, 210, 210))
-                draw.text((12, 48), "[物理IPM] 横向偏差: %+.3f米 | 航向夹角: %+.1f°" % (e_y, np.degrees(e_psi)), font=self.font_zh, fill=(0, 255, 255))
-                draw.text((12, 68), "[几何特征] 道路曲率: %.3f/m | 动态前瞻: %.2f米" % (curvature, lookahead_dist), font=self.font_zh, fill=(255, 200, 100))
-                draw.text((12, 88), "[RANSAC鲁棒] 内点率: %.1f%% | 滑窗有效点: %d" % (self.ransac_inlier_ratio * 100.0, num_pts), font=self.font_zh, fill=(100, 255, 255))
-                draw.text((12, 108), status_text, font=self.font_zh, fill=status_color)
-
-                # 采样点中文悬浮指示标签
-                if center_x != -1:
-                    draw.text((int(center_x) + 10, 310), "前瞻采样点", font=self.font_zh, fill=(0, 255, 255))
-
-                debug_img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
-
-            try:
-                self.debug_pub.publish(self.bridge.cv2_to_imgmsg(debug_img, "bgr8"))
-            except CvBridgeError:
-                pass
 
 if __name__ == '__main__':
     try:

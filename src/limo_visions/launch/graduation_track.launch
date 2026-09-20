@@ -1,14 +1,15 @@
 <launch>
-    <!-- 1. 工业级车道线感知与逆透视物理估计节点 (包含全中文 HUD 仪表盘与 RANSAC 鲁棒拟合) -->
+    <!-- 1. 工业级车道线高精度感知节点 (无OpenCV调试图开销，纯Pose几何引导发布) -->
     <node name="graduation_detect" pkg="limo_visions" type="graduation_detect.py" output="screen">
         <param name="image_topic" value="/color/image_raw" />
         <param name="target_lane_offset" value="0.45" />
     </node>
 
-    <!-- 2. 车道线自主巡线与拐弯控制节点 (基于示例巡线重构版) -->
+    <!-- 2. 车道线自主巡线与阿克曼平滑拐弯控制节点 -->
     <node name="graduation_control" pkg="limo_visions" type="graduation_control.py" output="screen">
-        <param name="cruise_speed" value="0.19" />
-        <param name="target_x" value="135" />
+        <param name="cruise_speed" value="0.20" />
+        <param name="target_x" value="140" />
         <param name="kp" value="0.007" />
+        <param name="turn_ang_vel" value="-0.38" />
     </node>
 </launch>

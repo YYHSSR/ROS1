@@ -19,7 +19,7 @@
          - 10.5: 极限极夜 (10.5% 极夜，相机传感器光学欠曝断线临界点)
          ========================================================================= -->
     <plugin name="world_light_controller" filename="libgazebo_world_light.so">
-      <light_percent>50</light_percent>
+      <light_percent>100</light_percent>
       <light_name>sun</light_name>
     </plugin>
 
