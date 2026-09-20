@@ -9,38 +9,39 @@
       <real_time_update_rate>1000</real_time_update_rate>
     </physics>
 
-    <!-- 场景配置: 白天自然天蓝背景，调优环境光与阳光对比度强化阴影 -->
+    <!-- =========================================================================
+         💡【仿真世界光照强度一键量化设置插件 (WorldPlugin)】
+         只需在下方 <light_percent> 中手动填写一个 0 ~ 100 的数字，保存后重启世界即可改变光照！
+         - 100 : 标准自然日光晴天 (100% 满光照)
+         - 70  : 阴天背阴 (70% 光照)
+         - 50  : 黄昏微光 (50% 光照)
+         - 20  : 深度暗光 (20% 光照，本文算法仍可稳定高精跟踪)
+         - 10.5: 极限极夜 (10.5% 极夜，相机传感器光学欠曝断线临界点)
+         ========================================================================= -->
+    <plugin name="world_light_controller" filename="libgazebo_world_light.so">
+      <light_percent>50</light_percent>
+      <light_name>sun</light_name>
+    </plugin>
+
     <scene>
-      <ambient>0.25 0.25 0.25 1.0</ambient>
-      <background>0.53 0.68 0.85 1.0</background>
+      <ambient>0.02625 0.02625 0.02625 1.0</ambient>
+      <background>0.1115 0.143 0.1785 1.0</background>
       <shadows>true</shadows>
     </scene>
 
-    <!-- 太阳主光源: 自然斜射日光，32° 黄金仰角 (elevation=32°，阴影修长立体且视觉适度)
-         方向矢量: azimuth≈NW, elevation=32° (dz=-0.53, |dxy|≈0.85) -->
+    <!-- 太阳主光源 -->
     <light name="sun" type="directional">
       <cast_shadows>true</cast_shadows>
       <pose>0 0 50 0 0 0</pose>
-      <diffuse>1.0 0.98 0.95 1.0</diffuse>
-      <specular>0.2 0.2 0.2 1.0</specular>
+      <diffuse>0.105 0.1029 0.09975 1.0</diffuse>
+      <specular>0.021 0.021 0.021 1.0</specular>
       <direction>-0.6 0.6 -0.53</direction>
     </light>
 
-    <!-- ================= 方案 A (当前启用): 固定高质感斜射自然日光 =================
+    <!-- ================= (当前启用): 固定高质感斜射自然日光 =================
          优势: 彻底 100% 消除任何单帧顿挫/跳变，物理引擎锁定 60 满帧 (RTF 1.00)；
          小车行驶时车体阴影逐帧实时动态跟随，建筑物静态长投影清晰深邃，对视觉车道线识别最稳定。
          ============================================================================= -->
-
-    <!-- ================= 方案 B (已注释备用): 30分钟长周期微步动态日光 =================
-         若以后需要进行多角度动态光照测试，可取消下方注释重新启用：
-    <plugin name="dynamic_sun" filename="libgazebo_dynamic_sun.so">
-      <cycle_period>1800.0</cycle_period>
-      <min_elevation>25.0</min_elevation>
-      <max_elevation>50.0</max_elevation>
-      <update_interval>3.0</update_interval>
-      <light_name>sun</light_name>
-    </plugin>
-    ================================================================================= -->
 
     <!-- 真实感沙盘环境: 2.5 倍等比缩放的高精路面与障碍物 (居中放置在 Gazebo 网格原点) -->
     <model name="ros_sandbox">

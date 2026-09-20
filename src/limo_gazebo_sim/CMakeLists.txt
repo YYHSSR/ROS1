@@ -32,7 +32,10 @@ target_link_libraries(gazebo_ros_ackerman ${catkin_LIBRARIES} ${Boost_LIBRARIES}
 add_library(gazebo_dynamic_sun src/gazebo_dynamic_sun.cpp)
 target_link_libraries(gazebo_dynamic_sun ${catkin_LIBRARIES} ${Boost_LIBRARIES})
 
-install(TARGETS gazebo_ros_ackerman gazebo_dynamic_sun
+add_library(gazebo_world_light src/gazebo_world_light.cpp)
+target_link_libraries(gazebo_world_light ${catkin_LIBRARIES} ${Boost_LIBRARIES})
+
+install(TARGETS gazebo_ros_ackerman gazebo_dynamic_sun gazebo_world_light
 ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}

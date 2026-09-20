@@ -10,18 +10,18 @@
     <!-- ================= 几何与物理参数定义 ================= -->
     <xacro:property name="M_PI" value="3.14159"/>
 
-    <xacro:property name="base_x_size" value="0.26" />
-    <xacro:property name="base_y_size" value="0.24" />
-    <xacro:property name="base_z_size" value="0.20" />
+    <xacro:property name="base_x_size" value="0.286" />
+    <xacro:property name="base_y_size" value="0.264" />
+    <xacro:property name="base_z_size" value="0.220" />
 
-    <xacro:property name="wheelbase" value="0.4"/>
-    <xacro:property name="track" value="0.28"/>
-    <xacro:property name="wheel_vertical_offset" value="-0.201996" />
+    <xacro:property name="wheelbase" value="0.44"/>
+    <xacro:property name="track" value="0.308"/>
+    <xacro:property name="wheel_vertical_offset" value="-0.222196" />
     <xacro:property name="base_mass" value="2.1557"/>
 
-    <xacro:property name="wheel_length" value="0.09" />
-    <xacro:property name="wheel_radius" value="0.09" />
-    <xacro:property name="wheel_scale" value="2 2 2" />
+    <xacro:property name="wheel_length" value="0.099" />
+    <xacro:property name="wheel_radius" value="0.099" />
+    <xacro:property name="wheel_scale" value="2.2 2.2 2.2" />
 
     <!-- ================= 底盘基准与车身 Link ================= -->
     <link name="base_footprint"/>
@@ -29,14 +29,14 @@
     <joint name="base_joint" type="fixed">
         <parent link="base_footprint"/>
         <child link="base_link"/>
-        <origin xyz="0.0 0.0 0.30" rpy="0 0 0"/>
+        <origin xyz="0.0 0.0 0.33" rpy="0 0 0"/>
     </joint>
 
     <link name="base_link">
         <visual>
-            <origin xyz="0 0 -0.30" rpy="0 0 1.57" />
+            <origin xyz="0 0 -0.33" rpy="0 0 1.57" />
             <geometry>
-                <mesh filename="package://limo_gazebo_sim/CAD/limo-model/limo_base.dae" scale="2 2 2"/>
+                <mesh filename="package://limo_gazebo_sim/CAD/limo-model/limo_base.dae" scale="2.2 2.2 2.2"/>
             </geometry>
         </visual>
         <collision>
@@ -65,15 +65,15 @@
 
     <!-- ================= 传感器装配 (包含 Gazebo 插件) ================= -->
     <xacro:limo_laser parent_prefix="base_link" frame_prefix="laser">
-        <origin xyz="0.206 0 -0.068" rpy="0 0 0"/>
+        <origin xyz="0.2266 0 -0.0748" rpy="0 0 0"/>
     </xacro:limo_laser>
 
     <xacro:limo_depth_camera parent_prefix="base_link" frame_prefix="depth_camera">
-        <origin xyz="0.168 0 0.06" rpy="0 0.2618 0"/>
+        <origin xyz="0.1848 0 0.066" rpy="0 0.2618 0"/>
     </xacro:limo_depth_camera>
 
     <xacro:limo_imu parent_prefix="base_link" frame_prefix="imu">
-        <origin xyz="0.0 0 -0.2" rpy="0 0 0"/>
+        <origin xyz="0.0 0 -0.22" rpy="0 0 0"/>
     </xacro:limo_imu>
 
     <!-- ================= 前轮转向机构装配 (转向铰链节 + 前轮) ================= -->
@@ -125,8 +125,8 @@
             <rightRearJoint>rear_right_wheel</rightRearJoint>
             <leftHingeJoint>left_steering_hinge_wheel</leftHingeJoint>
             <rightHingeJoint>right_steering_hinge_wheel</rightHingeJoint>
-            <wheelSeparation>0.344</wheelSeparation>
-            <wheelDiameter>0.18</wheelDiameter>
+            <wheelSeparation>0.3784</wheelSeparation>
+            <wheelDiameter>0.198</wheelDiameter>
             <wheelbase>${wheelbase}</wheelbase>
             <wheelTrack>${track}</wheelTrack>
             <robotBaseFrame>base_footprint</robotBaseFrame>

@@ -29,7 +29,7 @@
     <!-- 默认放置在直道路面起点 (x=-1.5, y=-3.0, z=0.15)；若放置在启停槽位可传参 x:=1.0 y:=-5.0 yaw:=1.57 -->
     <arg name="x" default="-1.5"/>
     <arg name="y" default="-3.0"/>
-    <arg name="z" default="0.15"/>
+    <arg name="z" default="0.18"/>
     <arg name="yaw" default="3.14"/>
 
     <!-- 在 Gazebo 中生成阿克曼小车模型 -->
@@ -49,8 +49,8 @@
     <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false" output="screen" args="limo_fl_steering_hinge_controller limo_fr_steering_hinge_controller"/>
     <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
 
-    <!-- 静态坐标变换发布 (TF: 雷达 & IMU) -->
-    <node pkg="tf" type="static_transform_publisher" name="base_link_to_laser_link" args="0.210 0.0 0.16 0.0 0.0 0.0 base_link laser_link 10" />
+    <!-- 静态坐标变换发布 (TF: 雷达 & IMU, 适配 1.1 倍几何缩放) -->
+    <node pkg="tf" type="static_transform_publisher" name="base_link_to_laser_link" args="0.227 0.0 0.176 0.0 0.0 0.0 base_link laser_link 10" />
     <node pkg="tf" type="static_transform_publisher" name="base_link_to_imu_link" args="0.0 0.0 0.0 0.0 0.0 0.0 base_link imu_link 10" />
 
     <!-- 启动 RViz 可视化界面 -->
