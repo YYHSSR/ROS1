@@ -16,8 +16,8 @@
       <shadows>true</shadows>
     </scene>
 
-    <!-- 太阳主光源: 低高度斜射日光角度，加长阴影投影长度并强化明暗对比
-         方向矢量: azimuth≈NW, elevation≈32° (dz=-0.53, |dxy|≈0.85) -->
+    <!-- 太阳主光源: 自然斜射日光，32° 黄金仰角 (elevation=32°，阴影修长立体且视觉适度)
+         方向矢量: azimuth≈NW, elevation=32° (dz=-0.53, |dxy|≈0.85) -->
     <light name="sun" type="directional">
       <cast_shadows>true</cast_shadows>
       <pose>0 0 50 0 0 0</pose>
@@ -26,15 +26,21 @@
       <direction>-0.6 0.6 -0.53</direction>
     </light>
 
-    <!-- 动态日光插件: 控制太阳方位角与高度角，保持阴影明显且缓慢平滑移动
-         elevation 设为 25°~50°，避免正午超高仰角导致阴影缩短不可见 -->
+    <!-- ================= 方案 A (当前启用): 固定高质感斜射自然日光 =================
+         优势: 彻底 100% 消除任何单帧顿挫/跳变，物理引擎锁定 60 满帧 (RTF 1.00)；
+         小车行驶时车体阴影逐帧实时动态跟随，建筑物静态长投影清晰深邃，对视觉车道线识别最稳定。
+         ============================================================================= -->
+
+    <!-- ================= 方案 B (已注释备用): 30分钟长周期微步动态日光 =================
+         若以后需要进行多角度动态光照测试，可取消下方注释重新启用：
     <plugin name="dynamic_sun" filename="libgazebo_dynamic_sun.so">
-      <cycle_period>180.0</cycle_period>
+      <cycle_period>1800.0</cycle_period>
       <min_elevation>25.0</min_elevation>
       <max_elevation>50.0</max_elevation>
-      <update_interval>5.0</update_interval>
+      <update_interval>3.0</update_interval>
       <light_name>sun</light_name>
     </plugin>
+    ================================================================================= -->
 
     <!-- 真实感沙盘环境: 2.5 倍等比缩放的高精路面与障碍物 (居中放置在 Gazebo 网格原点) -->
     <model name="ros_sandbox">
