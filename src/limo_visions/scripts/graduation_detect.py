@@ -1,626 +1,496 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-================================================================================
-项目名称: LIMO 智能车自动驾驶 - 工业级高精度车道线感知与几何解算节点
-源文件名: graduation_detect.py
-代码定位: 纯感知解耦节点 (订阅相机影像 -> 解算车道线物理特征 -> 输出控制偏差与车道线二值图)
-下游节点: graduation_control.py (斯坦利几何循迹控制器)
-================================================================================
+"""纯视觉黄色道路线检测节点，不向底盘发送速度指令。
 
-【系统核心六阶段架构总览 (System Architecture Overview)】:
---------------------------------------------------------------------------------
-【阶段一】图像光度自适应与动态 ROI 特征提取 (Image Preprocessing & Dynamic ROI)
-         - 1.1 动态自适应逆 Gamma 照度补偿: 支持 0.20 极暗微光至 1.00 强光自适应调节
-         - 1.2 HSV+LAB 双色彩空间黄色高精度提纯: 100% 滤除水泥墙、草坪、斑马线与白色箭头
-         - 1.3 多级形态学滤波: 开运算去除孤立微噪，闭运算平滑连通车道线
-         - 1.4 轨迹引导动态自适应 ROI: 依据航向角动态延展视场 (390px ~ 625px)
+处理链：光照自适应分割 -> 在候选黄色区域中锁定左侧目标黄线（滑动窗口跟踪）
+-> 在跟踪像素中定位目标列坐标 -> 发布 /lane_detect_pose。
 
-【阶段二】垂直自适应滑动窗口路径追踪 (Sliding Window Path Tracking)
-         - 2.1 底部车道线直方图峰值扫描与历史先验记忆引导
-         - 2.2 8 级垂直滑窗逐级爬升搜索与动态中心重定位
-         - 2.3 虚线间隙与稀疏特征廊道保底机制
+本节点沿用原有效果良好的亮度分级、Gamma、HSV/LAB 阈值和形态学分割方案，
+发布像素级目标数据，供 graduation_control.py 采用比例控制方式。
 
-【阶段三】逆透视几何空间映射 (Inverse Perspective Mapping, IPM)
-         - 3.1 基于相机安装物理参数 (离地高度 0.396m, 俯仰角 15°, 前偏置 0.185m)
-         - 3.2 像素二维坐标系 (u, v) 严格投影至小车底盘米制坐标系 (x_body, y_body)
+Pose 字段被约定为检测数据容器：
+  position.x     目标黄线在参考行附近的像素列（未检测到时为 -1）
+  position.y     画面下方中央 ROI 内黄色像素的纵向中心（用于丢线时判断搜索方向）
+  position.z     本帧跟踪到的黄线像素总数（用于判断是否完全丢线）
+  orientation.x  跟踪到的黄线最远端所在图像行号（用于提前发现前方缺口，无像素时为 -1）
+  orientation.y  position.x 对应黄线点在地面上距 base_link 的前方距离 (m)
+  orientation.z  position.x 对应黄线点在地面上距 base_link 的左侧距离 (m)
 
-【阶段四】RANSAC 几何多项式鲁棒拟合 (RANSAC Robust Polynomial Fitting)
-         - 4.1 纵向物理跨度几何先验校验 (>= 0.20m), 根除奇异矩阵与 RankWarning
-         - 4.2 35 轮随机抽样一致性迭代估计, 彻底剔除地砖缝隙、阴影散斑等离群噪点
-         - 4.3 自适应阶数拟合: 深度跨度充足时采用二次曲线，短跨度时采用一阶直线
+另发布 /lane_detect_right_points（geometry_msgs/Polygon）：目标黄线右侧最近的
+黄色线（右侧道路线/内侧街区边线）逐行投影到地面的点，x=前方、y=左侧 (m)。
 
-【阶段五】物理指标解算与时空滤波 (Metric Resolution & Temporal Filtering)
-         - 5.1 曲率自适应动态前瞻距离解算 (0.70m ~ 1.15m)
-         - 5.2 物理横向米制偏差 e_y (m) 解算 (目标车道中心偏置 0.45m)
-         - 5.3 物理航向角偏差 e_psi (rad) 解算
-         - 5.4 物理道路几何曲率 kappa (1/m) 解算
-         - 5.5 时序一阶低通滤波平滑与断线容错保护 (容忍连续 6 帧丢失)
-
-【阶段六】ROS 接口通信发布 (Publication & Data Contract)
-         - 6.1 发布 /lane_detect_pose: 输出全维度物理与几何参数 (供下游控制器订阅)
-         - 6.2 发布 /lane_detect_image: 输出二值化车道线分割掩膜
-================================================================================
+===========================================================================
+【调试速查】黄色自适应分割（Gamma 分档、HSV/LAB 阈值、形态学核）效果已经
+调好，不需要再动。下面这些跟"检测范围"和"跟踪逻辑"相关的参数在
+__init__ 及对应方法里标了【调试】注释，并说明了改动会带来什么效果，
+需要调整搜索范围/跟踪表现时优先看这些：
+  - target_rows / row_band                 定位目标列所用的参考行 & 容差
+  - side_hint_roi                          丢线搜索方向判断用的 ROI
+  - poly_pts（ROI 多边形顶点）              黄色检测的感兴趣区域范围
+  - nwindows / window_margin / min_recenter_pix
+    track_y_top / track_y_bottom           滑动窗口跟踪的搜索范围与窗口大小
+  - last_valid_x_px 初始值 / max_lost_tolerance   锁线跟踪的初始状态与容错
+  - track_velocity_smoothing / max_track_velocity  跟踪列的预测速度估计
+    （用"上一帧位置 + 速度"预测这一帧车道线大概在哪，急弯/起伏路段更
+    跟得上，缺口附近也更不容易误锁到无关的黄色物体）
+  - sliding_window_tracking 里的 support_floor / 锁线半径 / 权重衰减系数
+  - update_track_state 里的跟踪失败判定阈值
+===========================================================================
 """
 
-import warnings
 import rospy
 import cv2
 import numpy as np
 from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image
-from geometry_msgs.msg import Pose
+from geometry_msgs.msg import Point32, Polygon, Pose
 
 
 class AutonomousLaneDetector:
-    """
-    ============================================================================
-    【类名】AutonomousLaneDetector
-    【定位】车道线感知与几何解算核心处理器
-    【功能】实现从原始单目彩色图像到车辆底盘米制物理偏差的全自主解耦感知解算
-    ============================================================================
-    """
+    """从相机图像中自适应分割并跟踪左侧黄线，输出像素级目标数据。"""
 
     def __init__(self):
-        """
-        ========================================================================
-        【初始化函数】系统资源、参数服务器、标定参数与算法状态量初始化
-        ========================================================================
-        """
-        # ----------------------------------------------------------------------
-        # [配置 1/7] ROS 话题通信发布者接口初始化
-        # ----------------------------------------------------------------------
-        # 发布二值化车道线掩膜 (mono8 格式)
+        """读取检测参数、初始化跟踪状态，并连接 ROS 话题。"""
+        # /lane_detect_image 用于查看黄色掩膜，/lane_detect_pose 供控制器订阅。
         self.image_pub = rospy.Publisher("/lane_detect_image", Image, queue_size=1)
-        # 发布车道线位姿与几何物理契约消息 (Pose 格式，供下游 graduation_control.py 订阅)
         self.target_pub = rospy.Publisher("/lane_detect_pose", Pose, queue_size=1)
+        # 右侧黄线的地面点（x=前方距离, y=左侧距离, m，base_link 下）。
+        self.right_pub = rospy.Publisher("/lane_detect_right_points", Polygon, queue_size=1)
 
         self.bridge = CvBridge()
-
-        # ----------------------------------------------------------------------
-        # [配置 2/7] ROS 参数服务器载入 (纯感知参数，与控制算法彻底解耦)
-        # ----------------------------------------------------------------------
         image_topic = rospy.get_param("~image_topic", "/color/image_raw")
-        # 期望车辆相对于左侧黄色基准车道线的物理横向距离 (米), 默认 0.45m
-        self.target_lane_offset = rospy.get_param("~target_lane_offset", 0.45)
 
-        # ----------------------------------------------------------------------
-        # [配置 3/7] 相机空间内参与安装物理外参 (对应阶段三: 逆透视几何映射 IPM)
-        # 来源于 LIMO 仿真模型与相机标定话题 /camera_info
-        # ----------------------------------------------------------------------
-        self.fx = 381.36           # 相机水平焦距 (px)
-        self.fy = 381.36           # 相机垂直焦距 (px)
-        self.cx = 320.5            # 水平光学主点中心 (px)
-        self.cy = 240.5            # 垂直光学主点中心 (px)
-        self.h_cam = 0.396         # 相机离地物理安装高度 (m)
-        self.pitch = 0.2618        # 相机向下俯仰倾角 (15度 = 0.2618 rad)
-        self.x_cam_offset = 0.185  # 相机光心相对于小车底盘回转中心的前向偏置 (m)
+        # 【调试】参考行：定位目标列坐标时依次尝试这些行（从近到远、上下
+        # 交替），用于应对虚线间隙——某一行缺线就依次尝试邻近行。
+        # 效果：增删/调整行号会改变"能容忍多大的虚线间隙""目标列坐标响应
+        # 的灵敏度"；行号范围应落在跟踪窗口的搜索区间内（见下面的
+        # track_y_top ~ track_y_bottom），否则该行永远取不到跟踪像素。
+        # 末尾的 270/260/250 是远处兜底行：黄线向左拐、车为了不切弯晚转时，
+        # 黄线会先从近处几行的画面左侧移出，远处几行还能看到它，这时用远处
+        # 的列坐标继续转向，而不是被当成缺口直行。缺口处远端没有黄线，不受影响。
+        self.target_rows = [320, 310, 330, 300, 340, 350, 290, 360, 280, 370, 270, 260, 250]
+        # 【调试】每个参考行的容差半宽（像素）。调大更容易在该行命中黄线，
+        # 但取到的像素范围变宽、目标列坐标会更不精确；调小则相反。
+        self.row_band = 6
 
-        # ----------------------------------------------------------------------
-        # [配置 4/7] 形态学运算核与自适应 Gamma 逆拉伸查找表 (对应阶段一)
-        # ----------------------------------------------------------------------
-        # 开运算形态学核: 3x3 矩形核，滤除微光极暗环境下的细碎离群噪斑
+        # 相机模型：内参取自 /color/camera_info，安装位姿取自 limo URDF
+        # （depth_camera_joint：base_link 前方 0.1848 m、向下俯仰 0.2618 rad），
+        # 离地高度已用深度图实测为 0.385 m。仅用于把黄线像素换算到地面，
+        # 更换相机或安装位置时必须同步修改。
+        self.cam_f = 381.36246688113556
+        self.cam_cx = 320.5
+        self.cam_cy = 240.5
+        self.cam_x = 0.1848
+        self.cam_height = 0.385
+        self.cam_pitch = 0.2618
+
+        # 【调试】右侧黄线点：在这些图像行里找目标黄线右侧最近的黄色像素
+        # （画面第 320 行以下被车身挡住，行号不要超过 320）。行越多右侧线
+        # 采样越密，计算量略增；行号越小看得越远。
+        self.right_rows = list(range(250, 321, 6))
+        # 【调试】离目标黄线至少多少像素才算右侧黄线，用来排除目标黄线自身
+        # 的宽度与弯道处的横向展开。调小可能把目标黄线边缘误当右侧线，
+        # 调大则两线靠得近时会漏掉右侧线。
+        self.right_gap_px = 60
+
+        # 【调试】丢线时判断"原地转向搜索"还是"直行等待"所用的画面下方
+        # 中央 ROI：(y0, y1, x0, x1)。效果：这个框决定了判断搜索方向时看
+        # 的是画面哪一块区域；如果丢线后转向的方向经常判断反了/不合理，
+        # 可以尝试上下移动 y0/y1（离车更近或更远）或左右移动 x0/x1。
+        self.side_hint_roi = (360, 460, 270, 320)  # (y0, y1, x0, x1)
+
+        # 分割方案：开运算去小噪点，闭运算连接细小断裂（无需再调）。
         self.kernel_open = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-        # 闭运算形态学核: 5x5 矩形核，填补虚线微小断裂与连通细线
         self.kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
 
-        # 预计算 7 级照度 Gamma 逆拉伸查找表 (LUT), 消除实时浮点乘方开销
+        # 预计算 7 档 Gamma 查找表，避免每帧逐像素做幂运算（无需再调）。
         self.gamma_lut = {}
         for g in [0.20, 0.25, 0.35, 0.45, 0.60, 0.80, 1.00]:
             self.gamma_lut[g] = np.array([((i / 255.0) ** g) * 255 for i in range(256)]).astype('uint8')
 
-        # ----------------------------------------------------------------------
-        # [配置 5/7] 垂直自适应滑动窗口算法参数 (对应阶段二)
-        # ----------------------------------------------------------------------
-        self.nwindows = 9          # 纵向滑动窗口数量 (覆盖 180~475px 广阔纵深视锥)
-        self.window_margin = 65    # 单个窗口单侧水平半宽 (px, 65px 保障急弯处稳健连贯跟踪)
-        self.min_recenter_pix = 15 # 触发当前窗口中心向内点均值重定位的最小像素数阈值
+        # 亮度分级表：按 mean_l 由暗到亮排列的 (上界, Gamma, 场景标签,无需再调）)。
+        self.scene_table = [
+            (10.0, 0.20, "极夜深渊微光模式"),
+            (20.0, 0.25, "深渊暗光模式"),
+            (35.0, 0.35, "极暗微光模式"),
+            (55.0, 0.45, "微光黄昏模式"),
+            (80.0, 0.60, "局部浓荫模式"),
+            (110.0, 0.80, "正常日照模式"),
+            (float("inf"), 1.00, "高亮强光模式"),
+        ]
 
-        # ----------------------------------------------------------------------
-        # [配置 6/7] 轨迹引导动态 ROI 与 RANSAC 状态量 (对应阶段一与阶段四)
-        # ----------------------------------------------------------------------
-        self.dynamic_x_max = 400   # 严格锁定左侧道路线视场 (0 ~ 400px)，杜绝远端杂散干扰
-        self.dynamic_roi_poly = None # 当前动态 ROI 多边形顶点数组
-        self.ransac_inlier_ratio = 1.0 # 当前帧 RANSAC 拟合内点纯度 (0.0 ~ 1.0)
+        # HSV/LAB 阈值边界预先分配为 np.array，避免每帧重新构造（无需再调）。
+        self.hsv_lower = np.array([13, 50, 30])
+        self.hsv_upper = np.array([35, 255, 255])
+        self.lab_lower = np.array([0, 118, 138])
+        self.lab_upper = np.array([255, 150, 255])
 
-        # ----------------------------------------------------------------------
-        # [配置 7/7] 时序历史记忆与滤波状态量 (对应阶段五: 防丢线与时空滤波)
-        # ----------------------------------------------------------------------
-        self.last_fit_metric = None    # 上一有效帧底盘米制多项式拟合系数
-        self.last_valid_x_px = 100.0   # 上一有效帧车道线底部引导像素横坐标 (px)
-        self.last_heading = 0.0        # 一阶低通滤波平滑后的航向角 (rad)
-        self.lost_frame_count = 0      # 连续丢失车道线的帧计数器
-        self.max_lost_tolerance = 20   # 允许沿用历史拟合轨迹的最大容忍帧数 (约 0.67s，支撑弯道平稳巡航)
-
-        # 订阅相机原始图像话题，开启视觉回调主流水线
-        self.image_sub = rospy.Subscriber(image_topic, Image, self.callback, queue_size=1)
-        rospy.loginfo("自适应检测启动成功")
-
-    def pixel_to_body_frame(self, u, v):
-        """
-        ========================================================================
-        【函数名称】pixel_to_body_frame
-        【所属阶段】阶段三：逆透视几何空间映射 (Inverse Perspective Mapping, IPM)
-        【功能简述】利用针孔相机逆透视几何模型，将图像二维像素坐标 (u, v) 严格映射为
-                   小车底盘刚体米制坐标 (x_body, y_body)
-        【几何推导】
-                   1. 归一化相机坐标: xc = (u - cx)/fx, yc = (v - cy)/fy
-                   2. 视线沿地面法向量的投影分量: r_down = sin(pitch) + cos(pitch)*yc
-                   3. 地面空间投影比例因子: dist_scale = h_cam / r_down
-                   4. 前向纵向距离: x_body = dist_scale * (cos(pitch) - sin(pitch)*yc) + x_cam_offset
-                   5. 侧向横向距离: y_body = -dist_scale * xc (车体坐标系: X向前为正, Y向左为正)
-        【输入参数】u : float/int, 像素水平坐标 (列号, 0 ~ 639)
-                   v : float/int, 像素垂直坐标 (行号, 0 ~ 479)
-        【输出返回】x_body : float or None, 小车前方纵向物理距离 (米)
-                   y_body : float or None, 小车侧向横向物理距离 (米, 左正右负)
-        【异常处理】若射线指向地平线以上 (r_down <= 0.05), 则返回 (None, None)
-        ========================================================================
-        """
-        # [步骤 3.1] 计算像素点在归一化相机焦平面上的无量纲几何坐标
-        xc = (u - self.cx) / self.fx
-        yc = (v - self.cy) / self.fy
-
-        # [步骤 3.2] 计算光线在垂直地面重力方向上的投影分量
-        r_down = np.sin(self.pitch) + np.cos(self.pitch) * yc
-        if r_down <= 0.05:
-            # 滤除接近地平线或天空区域的发散光线
-            return None, None
-
-        # [步骤 3.3] 根据相机离地安装高度 h_cam 计算光线投射地面的几何缩放因子
-        dist_scale = self.h_cam / r_down
-        r_forward = np.cos(self.pitch) - np.sin(self.pitch) * yc
-
-        # [步骤 3.4] 坐标转换至小车底盘中心 (Base-Link Frame: X 前向为正, Y 左侧为正)
-        x_body = dist_scale * r_forward + self.x_cam_offset
-        y_body = -dist_scale * xc
-        return x_body, y_body
-
-    def extract_features(self, cv_image):
-        """
-        ========================================================================
-        【函数名称】extract_features
-        【所属阶段】阶段一：图像光度自适应与动态 ROI 特征提取
-        【功能简述】输入原始彩色相机影像，完成动态照度评估、对数逆 Gamma 拉伸、
-                   HSV+LAB 双色彩空间黄色高精度提纯、航向角动态 ROI 裁切与形态学滤波
-        【输入参数】cv_image : np.ndarray, 原始彩色图像 (480x640x3, BGR 格式)
-        【输出返回】mask_final : np.ndarray, 最终单通道二值化车道线掩膜 (480x640, uint8)
-                   mean_l     : float, 近处路面亮度均值 (0.0 ~ 255.0)
-                   gamma      : float, 当前匹配采用的逆 Gamma 增强系数
-                   scene_mode : str, 当前环境照度工况全中文名称 (供 HUD 显示)
-        ========================================================================
-        """
-        # [步骤 1.1] 近场路面照度评估 (采样小车前方核心路面区域: Y: 280~480, X: 0~400)
-        gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
-        mean_l = float(np.mean(gray[280:480, :400]))
-
-        # 分级自适应判定环境光照等级与匹配逆 Gamma 增强指数
-        if mean_l < 10.0:
-            gamma = 0.20
-            scene_mode = "极夜深渊微光模式"
-        elif mean_l < 20.0:
-            gamma = 0.25
-            scene_mode = "深渊暗光模式"
-        elif mean_l < 35.0:
-            gamma = 0.35
-            scene_mode = "极暗微光模式"
-        elif mean_l < 55.0:
-            gamma = 0.45
-            scene_mode = "微光黄昏模式"
-        elif mean_l < 80.0:
-            gamma = 0.60
-            scene_mode = "局部浓荫模式"
-        elif mean_l < 110.0:
-            gamma = 0.80
-            scene_mode = "正常日照模式"
-        else:
-            gamma = 1.00
-            scene_mode = "高亮强光模式"
-
-        # [步骤 1.2] 快速查表 (LUT) 执行非线性逆 Gamma 亮度动态拉伸
-        if gamma < 1.00:
-            cv_boosted = cv2.LUT(cv_image, self.gamma_lut[gamma])
-        else:
-            cv_boosted = cv_image
-
-        # [步骤 1.3] HSV 空间黄色精准提取:
-        # 黄色色相 H 严格约束在 [13, 35]，彻底滤除绿色草坪 (H>=40) 与天空背景；
-        # 饱和度 S 严格约束 >= 50，彻底滤除无饱和度的灰色水泥墙、沥青路面与白色标线 (S<=25)
-        hsv = cv2.cvtColor(cv_boosted, cv2.COLOR_BGR2HSV)
-        lower_yellow = np.array([13, 50, 30])
-        upper_yellow = np.array([35, 255, 255])
-        mask_hsv = cv2.inRange(hsv, lower_yellow, upper_yellow)
-
-        # [步骤 1.4] LAB 双色彩空间交叉校验:
-        # B 通道 (黄-蓝) 阈值 >= 138 (中性灰为128)，A 通道 (红-绿) 阈值 >= 118 (排除草坪绿色 A<=115)
-        lab = cv2.cvtColor(cv_boosted, cv2.COLOR_BGR2LAB)
-        mask_lab = cv2.inRange(lab, np.array([0, 118, 138]), np.array([255, 150, 255]))
-
-        # [步骤 1.5] 特征双空间逻辑交集与形态学多级滤波
-        mask_yellow = cv2.bitwise_and(mask_hsv, mask_lab)
-        mask_clean = cv2.morphologyEx(mask_yellow, cv2.MORPH_OPEN, self.kernel_open)
-        mask_clean = cv2.morphologyEx(mask_clean, cv2.MORPH_CLOSE, self.kernel_close)
-
-        # [步骤 1.6] 路面视场 ROI 掩膜 (过滤上方天花板与天空背景 Y < 200)
-        self.dynamic_x_max = 400  # 左侧车道线搜索限宽
-        roi_mask = np.zeros(cv_image.shape[:2], dtype=np.uint8)
+        # 【调试】ROI 多边形顶点：定义黄色检测的感兴趣区域范围，只裁掉图像
+        # 上部、横向保留全幅（以免弯道黄线被截断）。效果：缩小该区域可以
+        # 排除远处噪声或画面边缘的干扰物，但如果收得太小会把弯道处的黄线
+        # 也裁掉导致丢线；放大则相反，更容易引入干扰。
+        # 图像尺寸固定为 640x480，ROI 掩膜与帧无关，这里只栅格化一次。
+        self.roi_mask = np.zeros((480, 640), dtype=np.uint8)
         poly_pts = np.array([
             [0, 480],
             [640, 480],
             [640, 200],
             [0, 200]
         ], dtype=np.int32)
-        self.dynamic_roi_poly = poly_pts
-        cv2.fillPoly(roi_mask, [poly_pts], 255)
+        cv2.fillPoly(self.roi_mask, [poly_pts], 255)
 
-        # [步骤 1.7] 视窗裁剪，得到最终纯净黄色车道线掩膜
+        # 【调试】滑动窗口跟踪的搜索范围与窗口大小：
+        # nwindows：纵向窗口数。调大跟踪分段更细、对弯道形状更敏感，但计算
+        #   量增加；调小则相反，弯道细节容易被平均掉。
+        self.nwindows = 9
+        # window_margin：窗口水平半宽 (px)。调大能容纳更急的弯道、不容易在
+        #   弯道处跟丢，但也更容易把旁边的黄色干扰物（如建筑黄框）纳入窗口。
+        self.window_margin = 65
+        # min_recenter_pix：窗口内像素数超过此值才用均值重新定位窗口中心。
+        #   调大能过滤掉稀疏噪点，但黄线本身较细/较暗时窗口更容易续接不上。
+        self.min_recenter_pix = 15
+        # track_y_top / track_y_bottom：跟踪窗口纵向搜索范围的上/下边界
+        #   （图像行号）。调小 track_y_top 可以看得更远，但远处的黄线通常
+        #   更细小、更容易被噪声干扰；track_y_bottom 一般对应画面底部，
+        #   不建议超过图像高度 480。
+        self.track_y_top = 240
+        self.track_y_bottom = 475
+        self.window_height = int((self.track_y_bottom - self.track_y_top) / self.nwindows)
+
+        # 历史轨迹：用于下一帧找线；丢线时不把历史位置冒充为当前观测。
+        # 【调试】已跟踪黄线靠近画面底部的像素列初始值；建议与
+        # graduation_control.py 的 target_x 保持一致，否则刚启动时可能有
+        # 短暂的转向偏差。
+        self.last_valid_x_px = 115.0
+        self.track_confirmed = False   # 内部状态：首次成功跟踪后才按历史位置锁线，不建议手动改
+        self.lost_frame_count = 0      # 内部状态：连续跟踪失败帧数，不建议手动改
+        # 【调试】连续跟踪失败超过多少帧后清除锁线状态（重新自由搜索）。
+        # 应不小于 graduation_control.py 的 gap_hold_frames（60）：过缺口时
+        # 左侧黄线的延续段还没进入跟踪窗口，画面右侧却能看到车道右边线；
+        # 锁线状态保持期间只接受上一位置 130px 内的候选，右边线会被排除，
+        # 左侧延续段出现后才重新锁上。调小（如原来的 5）会在缺口里改锁
+        # 右边线，小车随即向右冲进内场；调大则误锁定错误目标后需要更久
+        # 才能摆脱。
+        self.max_lost_tolerance = 60
+
+        # 【调试】跟踪列速度估计：不是直接用"上一帧的静态位置"当参考点，
+        # 而是加上"最近几帧列坐标的变化速度"来预测"这一帧大概会在哪
+        # 出现"，这样急弯/起伏路段车道线快速平移时也能预判、跟得上；同时
+        # 弯道中出现的黄线缺口附近如果有别的不相关黄色物体，因为它的位置
+        # 通常跟"预测位置"对不上，也更不容易被误锁定。
+        self.last_valid_x_velocity = 0.0   # 内部状态：像素列变化速度估计 (px/帧)，不建议手动改
+        # 速度平滑系数 (0~1)：越大对最新变化越敏感（转弯响应快，但更容易被
+        # 噪声带偏）；越小越平滑（更稳，但转弯时预测会滞后）。
+        self.track_velocity_smoothing = 0.5
+        # 单帧最大允许的预测速度 (px/帧)：防止个别噪声帧的速度估计失控，
+        # 导致预测点跑到画面外。按急弯处相邻帧列坐标变化的实际观测值调整；
+        # 如果发现急弯仍然跟不上，可以适当调大。
+        self.max_track_velocity = 60.0
+
+        # 每收到一帧图像，callback 完成一次检测与发布。
+        self.image_sub = rospy.Subscriber(image_topic, Image, self.callback, queue_size=1)
+        rospy.loginfo("自适应检测启动成功")
+
+    def extract_features(self, cv_image):
+        """自适应黄色分割，返回掩膜及照度诊断值。
+
+        输入为当前仿真相机的 640x480 BGR 图像；返回 mask、平均亮度、
+        Gamma 档位、场景标签。后面三项仅供观察，不参与控制。
+        """
+        # 在近场路面取样，按平均灰度选择原有的七档 Gamma。
+        gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
+        mean_l = float(np.mean(gray[280:480, :400]))
+
+        # 阈值与 Gamma 档位来自已有、表现良好的检测方案；查表替代原 7 级 if-elif。
+        gamma, scene_mode = self._select_gamma_scene(mean_l)
+
+        # 暗场查表增亮；高亮场景保持原图。
+        if gamma < 1.00:
+            cv_boosted = cv2.LUT(cv_image, self.gamma_lut[gamma])
+        else:
+            cv_boosted = cv_image
+
+        # HSV 限定黄色色相和饱和度，排除大部分白色标线。
+        hsv = cv2.cvtColor(cv_boosted, cv2.COLOR_BGR2HSV)
+        mask_hsv = cv2.inRange(hsv, self.hsv_lower, self.hsv_upper)
+
+        # LAB 的 A/B 范围进一步排除草坪、灰色路面等干扰。
+        lab = cv2.cvtColor(cv_boosted, cv2.COLOR_BGR2LAB)
+        mask_lab = cv2.inRange(lab, self.lab_lower, self.lab_upper)
+
+        # 两个色彩空间都判为黄的像素才保留，再去噪并连接细小断裂。
+        mask_yellow = cv2.bitwise_and(mask_hsv, mask_lab)
+        mask_clean = cv2.morphologyEx(mask_yellow, cv2.MORPH_OPEN, self.kernel_open)
+        mask_clean = cv2.morphologyEx(mask_clean, cv2.MORPH_CLOSE, self.kernel_close)
+
+        # ROI 只裁掉图像上部；横向保留全幅，以免弯道黄线被截断。
+        # 图像尺寸固定为 640x480 时直接复用预计算好的 self.roi_mask；
+        # 万一输入尺寸有变化，兜底按原逻辑现场栅格化一次，保证正确性。
+        if cv_image.shape[:2] == self.roi_mask.shape:
+            roi_mask = self.roi_mask
+        else:
+            roi_mask = np.zeros(cv_image.shape[:2], dtype=np.uint8)
+            poly_pts = np.array([
+                [0, 480],
+                [640, 480],
+                [640, 200],
+                [0, 200]
+            ], dtype=np.int32)
+            cv2.fillPoly(roi_mask, [poly_pts], 255)
+
+        # 返回单通道 0/255 掩膜；这里尚未决定哪一条是目标黄线。
         mask_final = cv2.bitwise_and(mask_clean, roi_mask)
 
         return mask_final, mean_l, gamma, scene_mode
 
+    def _select_gamma_scene(self, mean_l):
+        """按平均亮度 mean_l 查表返回 (gamma, scene_mode)。
+
+        表的顺序/阈值/取值与原 7 级 if-elif 完全一致，只是换成更易读、
+        易调整的查表形式。
+        """
+        for upper_bound, gamma, scene_mode in self.scene_table:
+            if mean_l < upper_bound:
+                return gamma, scene_mode
+        # 理论上不可达（表的最后一档上界为 inf），保留兜底以防表被误改。
+        return self.scene_table[-1][1], self.scene_table[-1][2]
+
     def sliding_window_tracking(self, mask):
-        """
-        ========================================================================
-        【函数名称】sliding_window_tracking
-        【所属阶段】阶段二：垂直自适应滑动窗口路径追踪 (Sliding Window Path Tracking)
-        【功能简述】在二值化掩膜中以底部直方图峰值为起点，从底至顶分 9 层滑动窗口
-                   逐级聚类内点，动态微调下一层中心，精准排除窗口外杂散噪点
-        【输入参数】mask : np.ndarray, 阶段一输出的单通道二值化车道线掩膜 (480x640)
-        【输出返回】inlier_x      : np.ndarray, 滑窗聚类捕获的所有内点像素 X 坐标数组
-                   inlier_y      : np.ndarray, 滑窗聚类捕获的所有内点像素 Y 坐标数组
-                   window_boxes  : list, 滑动窗口的矩形几何包围盒坐标集合
-        ========================================================================
-        """
-        # [步骤 2.1] 设定滑动窗口纵向搜索区间 (Y: 240 ~ 475 px, 聚焦近场 0.58m ~ 2.0m, 杜绝远端弯道干扰)
-        y_bottom = 475
-        y_top = 240
-        window_height = int((y_bottom - y_top) / self.nwindows)
+        """从黄色掩膜选出目标黄线，并用自底向上的窗口收集其像素。
 
-        # 获取当前掩膜中所有白色像素点索引
-        nonzero = mask.nonzero()
-        nonzeroy = np.array(nonzero[0])
-        nonzerox = np.array(nonzero[1])
+        首次按初始位置与列支持量选线；锁定后优先沿上一帧黄线续接。
+        直线近端出现缺口时，全高度列统计仍可找到可见的远端部分。
+        """
+        # 使用 240~475 行；每个窗口的高度由 nwindows 决定（预计算于 __init__）。
+        y_bottom = self.track_y_bottom
+        y_top = self.track_y_top
+        window_height = self.window_height
 
-        # [步骤 2.2] 确定底部第一层滑动窗口的搜索基准中心 base_x
-        x_max = self.dynamic_x_max
-        # 优先采样近场路面 (Y: 340 ~ 475) 直方图，保障直道基准准确
-        hist_bottom = np.sum(mask[340:y_bottom, 10:x_max], axis=0)
-        if np.max(hist_bottom) > 0:
-            base_x = int(np.argmax(hist_bottom) + 10)
+        # 只对非零掩膜像素做窗口筛选；nonzero() 已返回独立数组，无需再拷贝。
+        nonzeroy, nonzerox = mask.nonzero()
+
+        # 全高度列统计给出起始候选，最低支持量可抑制孤立噪点。
+        # 弯道处黄线可能进入画面右半侧，因此始终搜索到当前掩膜的右边界。
+        x_max = mask.shape[1]
+        hist = np.count_nonzero(mask[y_top:y_bottom, 10:x_max], axis=0).astype(float)
+        if not np.any(hist):
+            return np.array([], dtype=int), np.array([], dtype=int)
+        # 【调试】候选列的最低支持像素数（取 6.0 和最大值 5% 里较大者）。
+        # 调大能过滤掉更多孤立噪点被误判为候选列，但如果黄线本身像素稀疏
+        # （比如远处、虚线间隙），也更容易因为达不到这个下限而找不到候选。
+        support_floor = max(6.0, 0.05 * float(np.max(hist)))
+        candidates = np.flatnonzero(hist >= support_floor) + 10
+        if len(candidates) == 0:
+            return np.array([], dtype=int), np.array([], dtype=int)
+        # 用"上一帧位置 + 估计速度"预测这一帧车道线大概会出现的列坐标，
+        # 而不是只用静态的上一帧位置。急弯/起伏路段车道线快速平移时，
+        # 这个预测点能提前跟上趋势；弯道中出现缺口时，附近若有别的不
+        # 相关黄色物体，它的位置通常跟预测点对不上，也就不容易被误选中。
+        prior_x = float(self.last_valid_x_px + self.last_valid_x_velocity)
+        if self.track_confirmed:
+            # 【调试】锁线后允许候选列偏离预测位置的最大像素距离（130px）。
+            # 调小能更快排除跳到其他黄色物体（如建筑黄框）的候选，更稳；
+            # 但太小会在急弯时把正确的黄线也一并排除掉，反而造成丢线。
+            candidates = candidates[np.abs(candidates - prior_x) <= 130]
+            if len(candidates) == 0:
+                return np.array([], dtype=int), np.array([], dtype=int)
+            # 锁线后限定与预测位置的距离，避免跳向建筑黄框等无关黄色物体。
+            base_x = int(candidates[np.argmin(np.abs(candidates - prior_x)
+                                               - 0.05 * hist[candidates - 10])])
         else:
-            # 近场无点时 (如急弯已切入)，搜索全视野直方图峰值
-            hist_active = np.sum(mask[y_top:y_bottom, 10:x_max], axis=0)
-            if np.max(hist_active) > 0:
-                base_x = int(np.argmax(hist_active) + 10)
-            else:
-                base_x = int(self.last_valid_x_px)
+            # 【调试】未锁线时，候选离预测位置越远权重衰减越快的系数
+            # （35.0）。调小衰减更快，初次选线会更倾向选择靠近预测位置的
+            # 候选（更稳）；但如果预测位置本身不准，反而更难找到正确目标。
+            weights = hist[candidates - 10] / (1.0 + np.abs(candidates - prior_x) / 35.0)
+            base_x = int(candidates[np.argmax(weights)])
 
         current_x = base_x
         lane_inds = []
-        window_boxes = []
 
-        # [步骤 2.3] 自底向上逐层滑窗迭代爬升
+        # 从图像底部向上移动窗口；只在窗口附近重新定位。
         for window in range(self.nwindows):
-            # 计算当前滑动窗口的四个边界物理像素坐标
             win_y_low = y_bottom - (window + 1) * window_height
             win_y_high = y_bottom - window * window_height
             win_x_low = max(0, int(current_x - self.window_margin))
             win_x_high = min(x_max, int(current_x + self.window_margin))
 
-            window_boxes.append(((win_x_low, win_y_low), (win_x_high, win_y_high)))
-
-            # 提取落入当前窗口区域内的候选像素点
+            # 收集窗口内属于候选黄线的像素。
             good_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) &
                          (nonzerox >= win_x_low) & (nonzerox < win_x_high)).nonzero()[0]
             lane_inds.append(good_inds)
 
-            # 若当前窗口有效内点充足，以均值更新下一层窗口的水平搜索中心
+            # 有足够像素才用均值更新中心，避免单个噪点拉偏。
             if len(good_inds) > self.min_recenter_pix:
                 current_x = int(np.mean(nonzerox[good_inds]))
             else:
-                # 弯道快速重定位: 当前滑窗内无点时，检查该水平切片是否有偏离窗口的黄色像素簇
+                # 当前窗口偏空时，只在当前轨迹附近尝试续接。
                 slice_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) &
-                              (nonzerox >= 10) & (nonzerox <= x_max)).nonzero()[0]
+                               (nonzerox >= 10) & (nonzerox <= x_max)).nonzero()[0]
                 if len(slice_inds) > self.min_recenter_pix:
-                    current_x = int(np.mean(nonzerox[slice_inds]))
+                    slice_x = nonzerox[slice_inds]
+                    nearby_x = slice_x[np.abs(slice_x - current_x) <= self.window_margin]
+                    if len(nearby_x) > self.min_recenter_pix:
+                        current_x = int(np.median(nearby_x))
 
-        # 合并所有滑动窗口捕获的内点索引
         lane_inds = np.concatenate(lane_inds) if len(lane_inds) > 0 else np.array([], dtype=int)
         inlier_x = nonzerox[lane_inds]
         inlier_y = nonzeroy[lane_inds]
 
-        # [步骤 2.4] 弯道与虚线特征廊道自适应保底
-        # 若急弯导致滑窗未能完全覆盖弧线，自动补充动态廊道内所有有效黄色内点
-        if len(inlier_x) < 50 or len(inlier_x) < int(0.35 * len(nonzerox)):
-            corridor_inds = ((nonzeroy >= y_top) & (nonzeroy <= y_bottom) &
-                             (nonzerox >= 10) & (nonzerox <= x_max)).nonzero()[0]
-            if len(corridor_inds) >= 30:
-                inlier_x = nonzerox[corridor_inds]
-                inlier_y = nonzeroy[corridor_inds]
+        return inlier_x, inlier_y
 
-        return inlier_x, inlier_y, window_boxes
+    def locate_target_column(self, inlier_x, inlier_y):
+        """在已锁定的黄线像素中，按参考行列表找目标列坐标（像素）。
 
-    @staticmethod
-    def _safe_polyfit(x, y, deg):
+        依次尝试 self.target_rows 中的行，命中即返回该行附近像素的
+        中位数列坐标；全部缺失时返回 -1，表示当前完全丢线。
         """
-        ========================================================================
-        【辅助函数】局部受控多项式拟合
-        【设计思想】采用 Python warnings 局部上下文管理器 (catch_warnings)，仅在
-                   拟合调用内部局部屏蔽 RankWarning，既杜绝终端警告刷屏与 I/O 阻塞，
-                   又保持全局 Python 警告配置的纯净规范。
-        ========================================================================
+        if len(inlier_x) == 0:
+            return -1.0, -1.0
+        for row in self.target_rows:
+            band = np.abs(inlier_y - row) <= self.row_band
+            if np.any(band):
+                return float(np.median(inlier_x[band])), float(row)
+        return -1.0, -1.0
+
+    def pixel_to_ground(self, u, v):
+        """把图像像素 (u, v) 投影到地面，返回 base_link 下的 (前方距离, 左侧距离) (m)。"""
+        ray_x = 1.0
+        ray_y = -(u - self.cam_cx) / self.cam_f
+        ray_z = -(v - self.cam_cy) / self.cam_f
+        cos_p = np.cos(self.cam_pitch)
+        sin_p = np.sin(self.cam_pitch)
+        fwd = ray_x * cos_p + ray_z * sin_p
+        down = ray_x * sin_p - ray_z * cos_p
+        scale = self.cam_height / down
+        return self.cam_x + scale * fwd, scale * ray_y
+
+    def compute_side_hint(self, mask):
+        """画面下方中央 ROI 内黄色像素的纵向中心，供丢线时判断搜索方向。
+
+        与 follow_lane_contest.py 的 center_y 语义一致：数值越小代表该
+        ROI 内越缺少黄色像素（更靠近画面上方或完全没有），此时应原地
+        转向寻找车道线；数值较大代表车身正对车道线，直行即可。
         """
-        with warnings.catch_warnings():
-            warnings.simplefilter('ignore', np.RankWarning)
-            return np.polyfit(x, y, deg)
+        y0, y1, x0, x1 = self.side_hint_roi
+        roi = mask[y0:y1, x0:x1]
+        ys = np.flatnonzero(np.any(roi == 255, axis=1))
+        if len(ys) == 0:
+            return float(y0 - 20)  # 默认低值，触发搜索转向
+        return float((ys.min() + ys.max()) / 2.0 + y0)
 
-    def fit_polynomial_ransac(self, bx, by, degree, max_trials=35, inlier_thresh=0.04):
+    def find_right_points(self, mask, inlier_x, inlier_y):
+        """找出目标黄线右侧最近的黄色像素（右侧道路线/内侧街区边线），
+        逐行投影到地面，供控制节点做右侧防压线保护。
+
+        只在目标黄线也出现的行里找：该行目标黄线列坐标右侧 right_gap_px
+        以外、离它最近的黄色像素。弯道处目标黄线会绕过画面、同一行里在
+        右侧再出现一次，所以与目标黄线连通的像素一律不算。
         """
-        ========================================================================
-        【函数名称】fit_polynomial_ransac
-        【所属阶段】阶段四：RANSAC 几何多项式鲁棒拟合 (RANSAC Polynomial Fitting)
-        【功能简述】在小车底盘米制坐标系 (bx, by) 下执行随机抽样一致性曲线拟合，
-                   彻底消除偶发地砖接缝阴影、离群噪点对多项式曲率解算的漂移干扰
-        【数值稳定性】引入两级防护机制：
-                   1. 几何与代数约束：严格校验纵向物理跨度 (>=0.20m) 及任意两采样点
-                      最小间距 (>=0.05m)，从源头杜绝近距共线点集导致的矩阵奇异性；
-                   2. 局部受控拟合：通过 _safe_polyfit 局部捕获偶发病态警告，保障
-                      控制主循环终端清爽。
-        【输入参数】bx            : np.ndarray, 底盘米制坐标系下的前向 X 坐标数组 (m)
-                   by            : np.ndarray, 底盘米制坐标系下的横向 Y 坐标数组 (m)
-                   degree        : int, 拟合多项式阶数 (1 为直线，2 为抛物线)
-                   max_trials    : int, RANSAC 迭代抽样轮数 (默认 35 轮)
-                   inlier_thresh : float, 点到模型横向残差容差门槛 (米, 默认 0.04m = 4cm)
-        【输出返回】final_coeffs  : np.ndarray, 拟合得到的多项式系数 (高次到常数项降序排列)
-                   ratio         : float, 最终模型内点占总样本的比例 (0.0 ~ 1.0)
-        ========================================================================
-        """
-        n_pts = len(bx)
-        sample_size = degree + 1
-        # 若样本点数不足以支撑稳定抽样，直接退化为全局普通最小二乘拟合
-        if n_pts < sample_size + 4:
-            return self._safe_polyfit(bx, by, degree), 1.0
-
-        best_inliers = None
-        best_count = 0
-        indices = np.arange(n_pts)
-
-        # [步骤 4.1] 随机抽样迭代寻找最优内点模型
-        for _ in range(max_trials):
-            sample_idx = np.random.choice(indices, sample_size, replace=False)
-
-            # 几何先验与代数条件数约束校验:
-            # 1. 采样集整体纵向跨度必须 >= 0.20m (杜绝点集过分簇聚)
-            # 2. 任意两采样点之间的纵向间距必须 >= 0.05m (杜绝同行或极近点导致范德蒙矩阵列共线与 RankWarning)
-            sample_x = bx[sample_idx]
-            if sample_size > 1:
-                sorted_x = np.sort(sample_x)
-                if (sorted_x[-1] - sorted_x[0] < 0.20) or (np.min(np.diff(sorted_x)) < 0.05):
-                    continue
-
-            try:
-                cand_coeffs = self._safe_polyfit(sample_x, by[sample_idx], degree)
-            except Exception:
+        polygon = Polygon()
+        if len(inlier_x) == 0:
+            return polygon
+        _, labels = cv2.connectedComponents(mask, connectivity=8)
+        line_labels = np.unique(labels[inlier_y, inlier_x])
+        other = (labels > 0) & ~np.isin(labels, line_labels)
+        for row in self.right_rows:
+            band = np.abs(inlier_y - row) <= self.row_band
+            if not np.any(band):
                 continue
+            line_col = float(np.median(inlier_x[band]))
+            cols = np.flatnonzero(other[row, :])
+            cols = cols[cols > line_col + self.right_gap_px]
+            if len(cols) == 0:
+                continue
+            fwd, left = self.pixel_to_ground(float(cols[0]), float(row))
+            polygon.points.append(Point32(x=fwd, y=left, z=0.0))
+        return polygon
 
-            # 计算全量样本在当前假定多项式下的物理横向残差
-            pred_y = np.polyval(cand_coeffs, bx)
-            residuals = np.abs(by - pred_y)
-            inliers = residuals < inlier_thresh
-            cnt = int(np.count_nonzero(inliers))
-
-            # 更新历史最大内点集
-            if cnt > best_count:
-                best_count = cnt
-                best_inliers = inliers
-                # 早停机制: 当内点率达到 85% 时直接提前收敛，节省算力
-                if cnt >= int(0.85 * n_pts):
-                    break
-
-        # [步骤 4.2] 利用最大内点集重新进行二次最小二乘参数重估计
-        if best_inliers is not None and best_count >= max(8, int(0.30 * n_pts)):
-            final_coeffs = self._safe_polyfit(bx[best_inliers], by[best_inliers], degree)
-            ratio = float(best_count) / float(n_pts)
-            return final_coeffs, ratio
-        else:
-            # [步骤 4.3] 保底回退机制 (退化为全局最小二乘拟合)
-            return self._safe_polyfit(bx, by, degree), 1.0
-
-    def compute_metric_and_control(self, inlier_x, inlier_y, mask=None):
-        """
-        ========================================================================
-        【函数名称】compute_metric_and_control (规范别名: compute_lane_metrics)
-        【所属阶段】阶段三、四、五综合解算模块
-        【功能简述】
-                   1. 采样 row 320 纵向道路线，严格锁定左侧车道线 (0 <= X <= 400)，杜绝远端弯道均值导致过早转弯
-                   2. 采样 mask[360:460, 250:350] 横向道路线以解算 center_y (弯道辅助判定)
-                   3. 调用 pixel_to_body_frame 将像素内点投影至机体物理米制系
-                   4. 调用 fit_polynomial_ransac 执行 RANSAC 多项式鲁棒拟合
-                   5. 解算横向物理偏差 e_y、航向角偏差 e_psi、曲率 kappa 与动态前瞻
-        【输入参数】inlier_x : np.ndarray, 滑动窗口捕获的车道线内点像素 X 坐标
-                   inlier_y : np.ndarray, 滑动窗口捕获的车道线内点像素 Y 坐标
-                   mask     : np.ndarray or None, 二值化车道线掩膜
-        【输出返回】center_x_px    : float, 当前有效车道线底部引导横坐标 (-1.0 表示断线/弯口)
-                   center_y       : float, 横向道路线参考纵坐标
-                   white_count_sum: int, 全局有效车道线像素数量
-                   fit_metric     : np.ndarray or None, 底盘米制拟合系数
-                   e_y            : float, 物理横向偏差 (米, 左正右负)
-                   e_psi          : float, 物理航向角偏差 (弧度, rad)
-                   curvature      : float, 道路物理几何曲率 kappa (1/m)
-                   lookahead_dist : float, 自适应计算的前瞻采样距离 (米)
-                   fit_ok         : bool, 当前感知解算是否有效
-        ========================================================================
-        """
-        num_pts = len(inlier_x)
-        fit_ok = False
-
-        # [步骤 5.1] 计算横向道路线位置 (纵向参考 center_y) 与全局像素量 (与 detect_lane_contest.py 保持一致)
-        if mask is not None:
-            color_y = mask[360:460, 250:350]
-            white_count_y = np.sum(color_y == 255)
-            white_count_sum = int(np.sum(mask == 255))
-            if white_count_y == 0:
-                center_y = 240.0
-            else:
-                white_index_y = np.where(color_y == 255)
-                center_y = float((white_index_y[0][white_count_y - 2] + white_index_y[0][0]) / 2.0 + 340.0)
-        else:
-            center_y = 240.0
-            white_count_sum = num_pts
-
-        # [步骤 5.2] 采样 row 320 近场引导，严格锁定左侧车道线 (0 <= X <= 400)
-        # 应对虚线间隙（主要检测 320 行，如在间隙依次检查邻近行，杜绝远端 180px 弯道均值导致过早转弯）
-        center_x_px = -1.0
-        if mask is not None:
-            target_rows = [320, 310, 330, 300, 340, 350, 290, 360]
-            for r in target_rows:
-                temp_x = mask[r, 0:400]
-                if np.sum(temp_x == 255) > 0:
-                    white_count_x = np.sum(temp_x == 255)
-                    white_index_x = np.where(temp_x == 255)
-                    if white_count_x >= 2:
-                        center_x_px = float((white_index_x[0][white_count_x - 2] + white_index_x[0][0]) / 2.0)
-                    else:
-                        center_x_px = float(white_index_x[0][0])
-                    break
-
-        if center_x_px >= 0:
-            self.last_valid_x_px = center_x_px
-            self.lost_frame_count = 0
-        else:
+    def update_track_state(self, inlier_x, inlier_y, num_pts):
+        """维护锁线状态与历史像素列，供下一帧续接跟踪使用。"""
+        # 【调试】本帧跟踪像素数低于该值（25）就视为本帧"跟踪失败"（不等于
+        # 完全丢线，完全丢线的阈值在 graduation_control.py 的
+        # min_line_pixels）。调大会更容易判定为跟踪失败、更快清除锁线状态
+        # 重新自由搜索；调小则相反，更倾向于坚持当前锁线位置。
+        if num_pts < 25:
             self.lost_frame_count += 1
+            if self.lost_frame_count > self.max_lost_tolerance:
+                self.track_confirmed = False
+            # 本帧没有更新到新位置：把速度估计往 0 衰减（打五折），避免
+            # 短暂丢线时还按丢线前的速度继续外推，导致预测点越跑越偏。
+            self.last_valid_x_velocity *= 0.5
+            return
 
-        # [步骤 5.3] 滤除超出左侧 ROI 边界的杂散边缘噪点并拟合米制底盘多项式
-        valid_body = []
-        if num_pts >= 25:
-            valid_mask = (inlier_x >= 10) & (inlier_x <= 400) & (inlier_y >= 240)
-            valid_x = inlier_x[valid_mask]
-            valid_y = inlier_y[valid_mask]
-
-            if len(valid_x) >= 20:
-                body_pts = [self.pixel_to_body_frame(px, py) for px, py in zip(valid_x, valid_y)]
-                valid_body = [p for p in body_pts if p[0] is not None]
-
-                if len(valid_body) >= 15:
-                    bx = np.array([p[0] for p in valid_body])
-                    by = np.array([p[1] for p in valid_body])
-                    dx_span = float(np.max(bx) - np.min(bx))
-
-                    try:
-                        degree = 2 if dx_span >= 0.30 else 1
-                        current_fit_metric, inlier_ratio = self.fit_polynomial_ransac(bx, by, degree)
-                        self.ransac_inlier_ratio = inlier_ratio
-                        fit_ok = True
-                    except Exception:
-                        fit_ok = False
-
-                    if fit_ok:
-                        if self.last_fit_metric is not None and len(self.last_fit_metric) == len(current_fit_metric):
-                            self.last_fit_metric = 0.8 * current_fit_metric + 0.2 * self.last_fit_metric
-                        else:
-                            self.last_fit_metric = current_fit_metric
-
-        if not fit_ok:
-            if self.lost_frame_count < self.max_lost_tolerance and self.last_fit_metric is not None:
-                pass
-            else:
-                self.last_fit_metric = None
-
-        # 若未检测到有效引导点或彻底丢失，返回断线状态
-        if self.last_fit_metric is None or center_x_px < 0:
-            return center_x_px, center_y, white_count_sum, None, 0.0, 0.0, 0.0, 0.65, False
-
-        # [步骤 5.4] 动态前瞻距离、横向偏差 e_y、航向角偏差 e_psi 与道路曲率解算
-        fit_metric = self.last_fit_metric
-        bx_min = float(np.min(bx)) if len(valid_body) > 0 else 0.50
-        bx_max = float(np.max(bx)) if len(valid_body) > 0 else 1.20
-
-        if len(fit_metric) == 3:
-            raw_kappa = abs(2.0 * fit_metric[0])
-            nominal_ld = max(0.50, min(0.80, 0.75 - 0.35 * min(raw_kappa, 1.0)))
-            lookahead_dist = max(min(nominal_ld, bx_max), max(0.50, bx_min))
-            y_lane_metric = fit_metric[0] * (lookahead_dist ** 2) + fit_metric[1] * lookahead_dist + fit_metric[2]
-            tangent_slope = 2.0 * fit_metric[0] * lookahead_dist + fit_metric[1]
-            curvature = float(abs(2.0 * fit_metric[0]) / ((1.0 + tangent_slope ** 2) ** 1.5))
-        else:
-            nominal_ld = 0.65
-            lookahead_dist = max(min(nominal_ld, bx_max), max(0.50, bx_min))
-            y_lane_metric = fit_metric[0] * lookahead_dist + fit_metric[1]
-            tangent_slope = fit_metric[0]
-            curvature = 0.0
-
-        # [步骤 5.5] 航向角一阶低通滤波平滑与状态返回
-        e_y = float(y_lane_metric - self.target_lane_offset)
-        e_psi = float(np.arctan(tangent_slope))
-        self.last_heading = 0.75 * e_psi + 0.25 * self.last_heading
-
-        return center_x_px, center_y, white_count_sum, fit_metric, e_y, e_psi, curvature, lookahead_dist, True
-
-    # 兼容规范别名，方便代码检索与外部调用
-    compute_lane_metrics = compute_metric_and_control
+        self.lost_frame_count = 0
+        self.track_confirmed = True
+        # 【调试】取最靠近画面底部多少行像素（12 行）的中位数来更新历史列
+        # 坐标。调大结果更平滑、抗噪能力更强，但对急弯的响应会变慢；调小
+        # 则响应更快，但更容易被单帧噪点带偏。
+        nearest_rows = inlier_y >= np.max(inlier_y) - 12
+        near_x = inlier_x[nearest_rows]
+        if len(near_x) > 0:
+            new_x = float(np.median(near_x))
+            # 用本帧与上一帧的列坐标差更新"速度"估计（指数平滑 + 限幅），
+            # 供下一帧 sliding_window_tracking 预测参考位置使用。
+            raw_velocity = new_x - self.last_valid_x_px
+            raw_velocity = max(-self.max_track_velocity,
+                                min(self.max_track_velocity, raw_velocity))
+            self.last_valid_x_velocity = (
+                self.track_velocity_smoothing * raw_velocity
+                + (1.0 - self.track_velocity_smoothing) * self.last_valid_x_velocity
+            )
+            self.last_valid_x_px = new_x
 
     def callback(self, data):
-        """
-        ========================================================================
-        【主回调函数】相机图像订阅回调主循环 (Main Sensor Pipeline Dispatcher)
-        【流水线全流程】:
-           [流水线 1/5] 阶段一: 提取车道线抗光照二值掩膜 (extract_features)
-           [流水线 2/5] 阶段二: 垂直滑动窗口连续追踪聚类 (sliding_window_tracking)
-           [流水线 3/5] 阶段三~五: IPM米制映射、RANSAC拟合与几何指标解算 (compute_lane_metrics)
-           [流水线 4/5] 阶段六.1: 发布车道线感知全息数据 (/lane_detect_pose)
-           [流水线 5/5] 阶段六.2: 发布二值化车道线图 (/lane_detect_image)
-        ========================================================================
-        """
+        """处理一帧相机图像，并发布检测结果及黄色掩膜。"""
         try:
             cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
         except CvBridgeError as e:
             rospy.logerr("CvBridge 转换错误: %s", str(e))
             return
 
-        # ----------------------------------------------------------------------
-        # [流水线 1/5] 阶段一: 图像光度自适应、特征融合与动态 ROI 裁切
-        # ----------------------------------------------------------------------
+        # 1. 分割所有黄色区域（自适应光照，效果保留不变）。
         mask, mean_l, gamma, scene_mode = self.extract_features(cv_image)
 
-        # ----------------------------------------------------------------------
-        # [流水线 2/5] 阶段二: 垂直自适应滑动窗口路径追踪
-        # ----------------------------------------------------------------------
-        inlier_x, inlier_y, window_boxes = self.sliding_window_tracking(mask)
+        # 2. 从黄色区域中跟踪目标黄线（滑动窗口锁线，避免误锁其他黄色物体）。
+        inlier_x, inlier_y = self.sliding_window_tracking(mask)
+        num_pts = len(inlier_x)
+        self.update_track_state(inlier_x, inlier_y, num_pts)
 
-        # ----------------------------------------------------------------------
-        # [流水线 3/5] 阶段三~五: 物理 IPM 映射、RANSAC 拟合与核心几何指标解算
-        # ----------------------------------------------------------------------
-        (center_x, center_y, num_pts, fit_metric,
-         e_y, e_psi, curvature, lookahead_dist, fit_ok) = self.compute_metric_and_control(inlier_x, inlier_y, mask)
+        # 3. 在跟踪像素中定位目标列坐标；计算丢线时的搜索方向辅助量。
+        center_x, center_row = self.locate_target_column(inlier_x, inlier_y)
+        side_hint_y = self.compute_side_hint(mask)
+        if center_x >= 0:
+            ground_fwd, ground_left = self.pixel_to_ground(center_x, center_row)
+        else:
+            ground_fwd, ground_left = 0.0, 0.0
 
-        # ----------------------------------------------------------------------
-        # [流水线 4/5] 阶段六.1: 发布车道线位姿与几何物理数据契约 (/lane_detect_pose)
-        # 字段映射表 (与下游 graduation_control.py 严格匹配对照):
-        #   position.x    : 引导点像素水平坐标 (px, -1 表示丢线断线)
-        #   position.y    : 动态自适应 ROI 右边界当前像素宽度 (px: 390 ~ 625)
-        #   position.z    : 滑动窗口捕获的有效车道线内点数量 (Points)
-        #   orientation.x : 物理横向米制偏差 e_y (m, 闭环跟踪控制核心量)
-        #   orientation.y : 物理航向角偏差 e_psi (rad, 斯坦利控制切线航向项)
-        #   orientation.z : 物理道路曲率 kappa (1/m, 弯道自适应调速核心量)
-        #   orientation.w : RANSAC 拟合内点纯度比率 (0.0 ~ 1.0)
-        # ----------------------------------------------------------------------
+        # 4. /lane_detect_pose 是检测数据接口：
+        #      position.x : 目标黄线参考列坐标 (px)；完全丢线时为 -1
+        #      position.y : 下方中央 ROI 黄色像素纵向中心 (px)，丢线搜索方向依据
+        #      position.z : 本帧跟踪到的黄线像素数，用于判断是否完全丢线
+        #      orientation.x : 跟踪到的黄线最远端所在的图像行号（最小 y）；
+        #                      数值越大说明前方可见黄线越短（即将到达缺口），
+        #                      没有跟踪像素时为 -1
+        #      orientation.y / orientation.z : position.x 对应的黄线点投影到
+        #                      地面后在 base_link 下的前方/左侧距离 (m)；
+        #                      position.x 为 -1 时两者均为 0，不可使用
         objPose = Pose()
         objPose.position.x = center_x
-        objPose.position.y = center_y
+        objPose.position.y = side_hint_y
         objPose.position.z = float(num_pts)
-        objPose.orientation.x = e_y
-        objPose.orientation.y = e_psi
-        objPose.orientation.z = curvature
-        objPose.orientation.w = float(self.ransac_inlier_ratio if fit_ok else 0.0)
+        objPose.orientation.x = float(np.min(inlier_y)) if num_pts > 0 else -1.0
+        objPose.orientation.y = ground_fwd
+        objPose.orientation.z = ground_left
         self.target_pub.publish(objPose)
+        self.right_pub.publish(self.find_right_points(mask, inlier_x, inlier_y))
 
-        # ----------------------------------------------------------------------
-        # [流水线 5/5] 阶段六.2: 发布二值化分割图像 (/lane_detect_image)
-        # ----------------------------------------------------------------------
+        # 5. 发布全部黄色区域的二值掩膜供观察。
         try:
             self.image_pub.publish(self.bridge.cv2_to_imgmsg(mask, "mono8"))
         except CvBridgeError:
             pass
+
 
 if __name__ == '__main__':
     try:
