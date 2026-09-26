@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limo 纯视觉巡线：调试问题全记录</title>
+<style>
+:root{--bg:#ffffff;--fg:#1f2328;--fg2:#57606a;--fg3:#8c959f;--fg4:#b1b8c0;--line:#d0d7de;--line2:#e7eaee;
+--fill:#f6f8fa;--fill2:#eceff3;--elev:#ffffff;--accent:#2f6fdb;--yellow:#d9a400;--teal:#1f9a8a;
+--orange:#e08a1e;--red:#c04848;--pink:#c85898;--green:#1f8a65;--info-bg:#eef4fd;--warn-bg:#fdf6e7;--danger-bg:#fcefef;--ok-bg:#ecf7f2}
+@media (prefers-color-scheme: dark){:root{--bg:#181a1f;--fg:#e6e6e6;--fg2:#a9adb4;--fg3:#7d828a;--fg4:#5a5f66;
+--line:#3a3e45;--line2:#2c3036;--fill:#22252b;--fill2:#2a2e35;--elev:#1f2227;--accent:#5b9cf5;--yellow:#e8c030;
+--teal:#2fb3a1;--orange:#f0a040;--red:#e06a6a;--pink:#e08ab8;--green:#3fbf8f;--info-bg:#1d2a3d;--warn-bg:#352d1a;
+--danger-bg:#3a2222;--ok-bg:#1c3129}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif}
+main{max-width:1180px;margin:0 auto;padding:28px 28px 60px}
+h1{font-size:24px;margin:0 0 6px}
+h2{font-size:18px;margin:0 0 10px}
+h3{font-size:15px;margin:0 0 8px}
+p{margin:0 0 8px}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.9em;background:var(--fill2);padding:1px 5px;border-radius:4px}
+pre{margin:0;padding:10px 12px;background:var(--fill);border:1px solid var(--line2);border-radius:6px;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow-x:auto;color:var(--fg)}
+.sub{color:var(--fg2)}.small{font-size:12.5px}.muted{color:var(--fg3)}.sec{color:var(--fg2)}
+.stack>*+*{margin-top:10px}
+.steps p{margin:0 0 6px}
+section{margin-top:30px}
+hr{border:0;border-top:1px solid var(--line2);margin:30px 0 0}
+.grid{display:grid;gap:22px;align-items:start}
+.g2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:860px){.g2,.g3{grid-template-columns:minmax(0,1fr)}}
+.stats{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0}
+.stat{border:1px solid var(--line2);border-radius:8px;padding:10px 14px;min-width:130px}
+.stat b{display:block;font-size:20px;font-weight:600}
+.stat span{font-size:12px;color:var(--fg2)}
+.stat.ok b{color:var(--green)}.stat.info b{color:var(--accent)}.stat.warn b{color:var(--orange)}
+table{border-collapse:collapse;width:100%;font-size:13px;border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+th{text-align:left;font-weight:600;color:var(--fg2);background:var(--fill);border-bottom:1px solid var(--line2);padding:7px 10px;white-space:nowrap}
+td{border-top:1px solid var(--line2);padding:7px 10px;vertical-align:top}
+tr.hl td:first-child::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-right:6px;vertical-align:middle}
+.tablewrap{overflow-x:auto}
+.pill{display:inline-block;font-size:11.5px;border:1px solid var(--line);border-radius:999px;padding:0 8px;color:var(--fg2);margin-right:4px;white-space:nowrap}
+button.pill{background:none;cursor:pointer;font:inherit;font-size:12px;padding:2px 10px}
+button.pill.active{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.callout{border-radius:8px;padding:10px 14px;border:1px solid var(--line2)}
+.callout .t{font-weight:600;margin-bottom:4px}
+.callout.info{background:var(--info-bg)}.callout.warning{background:var(--warn-bg)}.callout.danger{background:var(--danger-bg)}.callout.neutral{background:var(--fill)}
+details{border-top:1px solid var(--line2);padding:8px 0}
+details:last-of-type{border-bottom:1px solid var(--line2)}
+summary{cursor:pointer;font-weight:600;list-style:none;display:flex;align-items:center;gap:8px}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"\25B8";color:var(--fg3);font-size:12px;transition:transform .15s}
+details[open]>summary::before{transform:rotate(90deg)}
+details>.body{padding:10px 0 4px 20px}
+.tl{display:grid;grid-template-columns:34px 1fr;column-gap:12px}
+.tl .rail{display:flex;flex-direction:column;align-items:center}
+.tl .dot{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--accent);color:var(--accent);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.tl .dot.rev{border-color:var(--red);color:var(--red)}.tl .dot.other{border-color:var(--fg3);color:var(--fg3)}
+.tl .line{width:1px;flex:1;background:var(--line);min-height:14px}
+.tl .content{padding-bottom:22px}
+.kv{display:grid;grid-template-columns:52px 1fr;gap:4px 10px;font-size:12.5px;margin-top:6px}
+.kv .k{color:var(--fg3)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.footer{margin-top:40px;color:var(--fg3);font-size:12px;border-top:1px solid var(--line2);padding-top:10px}
+svg text{font-family:inherit}
+</style>
+</head>
+<body>
+<main>
+
+<h1>Limo 纯视觉巡线：调试问题全记录</h1>
+<p class="sub">Gazebo 仿真中的阿克曼小车沿左侧黄线巡线。涉及 <code>graduation_detect.py</code>（检测）与 <code>graduation_control.py</code>（控制），覆盖两次对话中遇到的全部问题。</p>
+
+<div class="grid g2" style="margin-top:22px">
+<div class="stack"><h2>最终结果</h2>
+<p class="small sec">默认参数下从出生点跑完整圈：两处缺口直行通过，全程不压线，只在两处缺口短暂丢线（各约 19 帧），从未进入找线模式。</p>
+<div class="stats"><div class="stat ok"><b>0</b><span>压线次数（整圈）</span></div><div class="stat "><b>13.8 cm</b><span>全程右侧最小净距</span></div><div class="stat "><b>19 cm</b><span>全程左侧最小净距</span></div><div class="stat ok"><b>2 / 2</b><span>缺口直行通过</span></div><div class="stat "><b>0</b><span>找线搜索指令</span></div><div class="stat ok"><b>5400 / 5400</b><span>重构前后消息一致</span></div></div>
+<div class="tablewrap"><table><thead><tr><th>路段</th><th>左侧最小净距</th><th>右侧最小净距</th></tr></thead><tbody><tr><td>初始左下弯</td><td>22.2 cm</td><td>17.6 cm</td></tr><tr><td>顶部凸起</td><td>19.0 cm</td><td>20.4 cm</td></tr><tr><td>右上角</td><td>22.2 cm</td><td>15.4 cm</td></tr><tr><td>右下角</td><td>21.0 cm</td><td>13.8 cm</td></tr><tr><td>其余路段</td><td>≥ 21 cm</td><td>—</td></tr></tbody></table></div>
+<p class="small muted">净距 = 车轮外沿到黄线中心的距离（含黄线半宽约 3 cm）。来源：最终参数整圈实测。</p>
+</div>
+<div class="stack"><h2>赛道与问题位置</h2><svg viewBox="0 0 520 300" width="100%" style="max-width:520px;display:block">
+<defs><marker id="tr-ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--fg3)"/></marker></defs>
+<path d="M60 40L60 262L280 262M320 262L460 262L460 40L250 40Q225 72 200 40L110 40" fill="none" stroke-width="4" stroke-linejoin="round" style="stroke:var(--yellow)"/>
+<path d="M100 80L100 222L420 222L420 80Z" fill="none" stroke-width="2" stroke-dasharray="6 5" opacity=".6" style="stroke:var(--yellow)"/>
+<path d="M80 240L80 60L440 60L440 240L200 240" fill="none" stroke-width="1.2" marker-end="url(#tr-ar)" style="stroke:var(--fg3)"/>
+<circle cx="190" cy="262" r="9" stroke-width="1.5" style="fill:var(--bg);stroke:var(--accent)"/><text x="190" y="266" font-size="10" font-weight="600" text-anchor="middle" style="fill:var(--accent)">S</text><text x="190" y="288" font-size="11" text-anchor="middle" style="fill:var(--fg2)">出生点（朝左）</text><circle cx="72" cy="250" r="9" stroke-width="1.5" style="fill:var(--bg);stroke:var(--accent)"/><text x="72" y="254" font-size="10" font-weight="600" text-anchor="middle" style="fill:var(--accent)">a</text><text x="88" y="242" font-size="11" text-anchor="start" style="fill:var(--fg2)">初始左下弯（效果好）</text><circle cx="72" cy="52" r="9" stroke-width="1.5" style="fill:var(--bg);stroke:var(--accent)"/><text x="72" y="56" font-size="10" font-weight="600" text-anchor="middle" style="fill:var(--accent)">b</text><text x="88" y="78" font-size="11" text-anchor="start" style="fill:var(--fg2)">左上角缺口（问题 6）</text><circle cx="225" cy="60" r="9" stroke-width="1.5" style="fill:var(--bg);stroke:var(--accent)"/><text x="225" y="64" font-size="10" font-weight="600" text-anchor="middle" style="fill:var(--accent)">c</text><text x="225" y="94" font-size="11" text-anchor="middle" style="fill:var(--fg2)">顶部凸起（问题 7、8）</text><circle cx="448" cy="50" r="9" stroke-width="1.5" style="fill:var(--bg);stroke:var(--accent)"/><text x="448" y="54" font-size="10" font-weight="600" text-anchor="middle" style="fill:var(--accent)">d</text><text x="432" y="76" font-size="11" text-anchor="end" style="fill:var(--fg2)">右上角（右侧较近）</text><circle cx="448" cy="250" r="9" stroke-width="1.5" style="fill:var(--bg);stroke:var(--accent)"/><text x="448" y="254" font-size="10" font-weight="600" text-anchor="middle" style="fill:var(--accent)">e</text><text x="432" y="242" font-size="11" text-anchor="end" style="fill:var(--fg2)">右下角（问题 8 右轮压线）</text><circle cx="300" cy="262" r="9" stroke-width="1.5" style="fill:var(--bg);stroke:var(--accent)"/><text x="300" y="266" font-size="10" font-weight="600" text-anchor="middle" style="fill:var(--accent)">f</text><text x="300" y="288" font-size="11" text-anchor="middle" style="fill:var(--fg2)">底部中间缺口</text>
+<text x="260" y="150" font-size="11" text-anchor="middle" style="fill:var(--fg3)">内侧街区边线（右侧黄线）</text>
+<text x="260" y="166" font-size="10" text-anchor="middle" style="fill:var(--fg4)">示意图，不按比例；灰色箭头为行驶方向（顺时针）</text>
+<text x="20" y="150" font-size="11" text-anchor="middle" transform="rotate(-90 20 150)" style="fill:var(--fg3)">左侧黄线（跟踪目标）</text>
+</svg></div>
+</div>
+<hr>
+<section><div class="row"><h2 style="margin:0">本次对话：从缺口到防压线保护</h2><span class="small muted">10 个问题</span></div>
+<div style="margin-top:14px"><div class="tl"><div class="rail"><div class="dot ">1</div><div class="line"></div></div>
+<div class="content" style=""><div class="row"><b>检测代码工程化重构</b><span class="small muted">已解决</span><span class="pill">graduation_detect.py</span></div>
+<div class="kv"><span class="k">现象</span><span>检测效果很好，希望在不改变效果的前提下优化实现。</span><span class="k">根因</span><span>每帧重复构造 ROI 掩膜与阈值数组，7 级 if-elif、名不副实的 dynamic_x_max、多余的数组拷贝。</span>
+<span class="k">修改</span><span><div>· 常量移到初始化预计算</div><div>· 亮度分级改为查表</div><div>· 删除无用属性与多余拷贝</div></span><span class="k">结果</span><span class="sec">4 张合成图（弯道、暗光虚线、无黄线、强光右弯）逐像素对拍全部一致。</span></div></div></div><div class="tl"><div class="rail"><div class="dot ">2</div><div class="line"></div></div>
+<div class="content" style=""><div class="row"><b>输出字段梳理与注释规范</b><span class="small muted">已解决</span><span class="pill">graduation_detect.py</span><span class="pill">graduation_control.py</span></div>
+<div class="kv"><span class="k">现象</span><span>需要弄清检测节点输出什么，并按规则重写注释。</span><span class="k">根因</span><span>注释分散、颜色分割部分给了不需要的调参建议。</span>
+<span class="k">修改</span><span><div>· 明确 /lane_detect_pose 字段约定。</div><div>· 颜色自适应部分只标“已调好”，检测范围与速度转角参数加【调试】并说明改动效果。</div></span><span class="k">结果</span><span class="sec">逻辑未改，同一测试图输出一致。</span></div></div></div><div class="tl"><div class="rail"><div class="dot ">3</div><div class="line"></div></div>
+<div class="content" style=""><div class="row"><b>缺口直行 + 弯道自动调整（第一版）</b><span class="small muted">已解决</span><span class="pill">graduation_control.py</span></div>
+<div class="kv"><span class="k">现象</span><span>要求经过缺失黄线处继续直行、弯曲处自动调整方向、全程不压线。</span><span class="k">根因</span><span>丢线就停车或原地搜索，没有“开过缺口”的机制；纯 P 控制在弯道容易超调。</span>
+<span class="k">修改</span><span><div>· 新增 gap_hold_frames（10 帧）沿用上一帧转向。</div><div>· P 控制改为 PD（kd 默认 0），恢复第一帧不用微分项。</div></span><span class="k">结果</span><span class="sec">离线验证通过，但实车在左上角缺口前出问题。</span></div></div></div><div class="tl"><div class="rail"><div class="dot ">4</div><div class="line"></div></div>
+<div class="content" style=""><div class="row"><b>左上角缺口前提前左拐</b><span class="small muted">已解决</span><span class="pill">graduation_detect.py</span></div>
+<div class="kv"><span class="k">现象</span><span>还没到左上角缺口就开始左拐压线，随后右拐回到车道。</span><span class="k">根因</span><span>锁线参考点只用上一帧的静态位置，急弯处跟不上，缺口附近容易误锁其他黄色物体。</span>
+<span class="k">修改</span><span><div>· 锁线参考点改为“上一帧位置 + 平滑速度”的预测位置，丢线时速度减半衰减。</div></span><span class="k">结果</span><span class="sec">复现了弯道跟丢的相关问题并修复，但原问题的主因在下一条。</span></div></div></div><div class="tl"><div class="rail"><div class="dot other">5</div><div class="line"></div></div>
+<div class="content" style=""><div class="row"><b>仿真环境异常：小车不在原位、键盘无法控制</b><span class="small muted">环境问题</span><span class="pill">环境</span></div>
+<div class="kv"><span class="k">现象</span><span>重启后小车不在出生点，teleop_twist_keyboard 无法控制。</span><span class="k">根因</span><span>调试时用 /gazebo/delete_model 重新生成小车导致 gzserver 崩溃，后台还残留旧进程。</span>
+<span class="k">修改</span><span><div>· 清理全部后台进程，由用户手动重启仿真。</div><div>· 之后复位只用 set_model_state，不再删除模型。</div></span><span class="k">结果</span><span class="sec">环境恢复正常。</span></div></div></div><div class="tl"><div class="rail"><div class="dot ">6</div><div class="line"></div></div>
+<div class="content" style=""><div class="row"><b>缺口前微左转 → 停止 → 重新启动</b><span class="small muted">已解决</span><span class="pill">graduation_detect.py</span><span class="pill">graduation_control.py</span></div>
+<div class="kv"><span class="k">现象</span><span>到左上角缺口前先微微左转压线，然后停住，过一段时间又自己开起来。</span><span class="k">根因</span><span>四个原因叠加：①缺口前黄线末端向左外弯，控制器跟着转；②丢线后停车，阿克曼底盘停车无法转向，卡了 103 s 才靠物理抖动“碰巧”恢复；③直行只保持 10 帧（约 1 s），而从末端外弯到重新看到黄线约需 43 帧；④检测端丢线 5 帧就放弃锁线，改锁右侧道路线。</span>
+<span class="k">修改</span><span><div>· 检测新增 orientation.x（黄线最远端行号）；控制在最远端行号 ≥ 298 且列坐标在目标列左侧时判为“快到缺口”并直行。</div><div>· gap_hold_frames 10 → 60；超时后边前进边右转搜索（-0.38），不再停车。</div><div>· max_lost_tolerance 5 → 60，过缺口期间保持锁线。</div></span><span class="k">结果</span><span class="sec">180 s 整圈：两处缺口都直行通过（43 / 42 帧），全程没有停车和搜索。</span></div></div></div><div class="tl"><div class="rail"><div class="dot ">7</div><div class="line"></div></div>
+<div class="content" style=""><div class="row"><b>左上角转弯后弯曲路段（顶部凸起）持续压线</b><span class="small muted">已解决</span><span class="pill">graduation_detect.py</span><span class="pill">graduation_control.py</span></div>
+<div class="kv"><span class="k">现象</span><span>顶部黄线有一段向车道内凸起，小车经过时左侧车身持续压线。</span><span class="k">根因</span><span>相机看不到车身旁边：画面第 320 行以下被车身挡住，最近只能看到车前约 0.95 m。按目标列转向等于瞄着前方约 1 m 的点，黄线左拐时会提前切弯。改 target_x（110 / 95 / 80）和延迟左转都无效。</span>
+<span class="k">修改</span><span><div>· 检测把目标点投影到地面（orientation.y / z，单位 m）。</div><div>· 控制按里程计记住看到过的左侧黄线点，沿候选角速度预测 1.5 s 轨迹，左侧会比 side_margin 更贴线就少转或不转。</div></span><span class="k">结果</span><span class="sec">凸起处最小净距 0 → 4.4 cm，两处缺口行为不变。</span></div></div></div><div class="tl"><div class="rail"><div class="dot ">8</div><div class="line"></div></div>
+<div class="content" style=""><div class="row"><b>右下角右轮压线 + 凸起处仍太极限</b><span class="small muted">已解决</span><span class="pill">graduation_detect.py</span><span class="pill">graduation_control.py</span></div>
+<div class="kv"><span class="k">现象</span><span>右下角转弯时右轮压到右侧黄线；凸起处虽不压线但离左线太近。</span><span class="k">根因</span><span>与凸起问题镜像：右转时看到 1 m 外外侧线开始弯就提前右转约 0.35 m，右侧车身扫过内侧线端。另外 target_x=140 时车只想离线约 20 cm，单纯调大 side_margin 会拦住几乎所有左转。</span>
+<span class="k">修改</span><span><div>· 检测新增 /lane_detect_right_points：目标黄线右侧最近的另一条黄线（排除与目标黄线连通的像素）投影到地面。</div><div>· 保护扩展到左右两侧，right_margin 0.15；预测改为绕后轴转动、转向角速度上限 0.4 rad/s。</div><div>· target_x 140 → 115，side_margin 0.15 → 0.25；某侧已小于要求时只要求“不再更近”。</div><div>· 参考行末尾加 270 / 260 / 250 远处兜底行，左拐晚转时黄线从近处行移出也不会被当成缺口。</div></span><span class="k">结果</span><span class="sec">右下角右侧净距 4.4 → 14 cm，凸起处左侧约 9 → 19 cm，两次整圈结果几乎相同。</span></div></div></div><div class="tl"><div class="rail"><div class="dot ">9</div><div class="line"></div></div>
+<div class="content" style=""><div class="row"><b>最终代码重构</b><span class="small muted">已解决</span><span class="pill">graduation_detect.py</span><span class="pill">graduation_control.py</span></div>
+<div class="kv"><span class="k">现象</span><span>要求优化结构和流程、清理注释、删除比赛代码相关字眼，行为保持不变。</span><span class="k">根因</span><span>多轮调试累积了历史注释和对照说明，pose_callback 过长。</span>
+<span class="k">修改</span><span><div>· 检测 503 → 388 行：初始化按阶段拆分，写死的数改为带【调试】注释的命名参数。</div><div>· 控制 391 → 340 行：参数分三组，pose_callback 拆为 _update_line_state 和 _base_turn。</div></span><span class="k">结果</span><span class="sec">离线闭环渲染整圈测试：新旧代码 5400 条消息、1800 张掩膜逐位一致，另两个偏离起点场景也一致。</span></div></div></div><div class="tl"><div class="rail"><div class="dot other">10</div></div>
+<div class="content" style="padding-bottom:0"><div class="row"><b>是否加入 BEV / RANSAC / Kalman 等</b><span class="small muted">保持现状</span><span class="pill">评估</span></div>
+<div class="kv"><span class="k">现象</span><span>询问是否需要鸟瞰变换、曲线拟合、曲率、置信度、Kalman、动态 ROI。</span><span class="k">根因</span><span>可见路面只有车前约 0.95 ~ 1.6 m，拟合曲率噪声大；多数功能已以简化形式存在。</span>
+<span class="k">修改</span><span><div>· 保持现状，不改代码。</div></span><span class="k">结果</span><span class="sec">论文中可把现有的地面投影、预测跟踪、锁线半径等对应到这些概念。</span></div></div></div></div></section>
+<section><div class="row"><h2 style="margin:0">更早的对话：从几何控制到像素控制</h2><span class="small muted">5 个问题</span></div>
+<div style="margin-top:14px"><div class="tl"><div class="rail"><div class="dot ">E1</div><div class="line"></div></div>
+<div class="content" style=""><div class="row"><b>几何链路控制效果差</b><span class="small muted">已解决</span><span class="pill">graduation_detect.py</span><span class="pill">graduation_control.py</span></div>
+<div class="kv"><span class="k">现象</span><span>检测效果很好，但用相机投影 + RANSAC 拟合 + Pure Pursuit 的控制链路巡线表现不好。</span><span class="k">根因</span><span>几何链路环节多（投影、拟合、曲率前馈、转角限幅），任何一环有误差都会放大到转向上，而且难以调参。</span>
+<span class="k">修改</span><span><div>· 检测节点删掉投影与 RANSAC，只输出像素量：目标列、搜索方向辅助量、跟踪像素数。</div><div>· 控制节点改为恒速 + 目标列像素误差比例控制，保留看门狗。</div></span><span class="k">结果</span><span class="sec">巡线不压线、拐弯正常，但在黄线缺口处卡住。</span></div></div></div><div class="tl"><div class="rail"><div class="dot ">E2</div><div class="line"></div></div>
+<div class="content" style=""><div class="row"><b>黄线缺口处卡住不动</b><span class="small muted">已解决</span><span class="pill">graduation_control.py</span></div>
+<div class="kv"><span class="k">现象</span><span>左侧黄线有一段断开，小车开到这里停住不再前进。</span><span class="k">根因</span><span>跟踪像素过少就立即停车；车停下后画面不再变化，永远等不到黄线重新出现（感知与运动互相锁死）。</span>
+<span class="k">修改</span><span><div>· 引入丢线容忍期：1.2 s 内沿用最近一次转向继续行驶，超时才停车。</div></span><span class="k">结果</span><span class="sec">不再立刻停车，但引出了提前左拐的问题。</span></div></div></div><div class="tl"><div class="rail"><div class="dot ">E3</div><div class="line"></div></div>
+<div class="content" style=""><div class="row"><b>Ctrl+C 无法结束控制节点</b><span class="small muted">已解决</span><span class="pill">graduation_control.py</span></div>
+<div class="kv"><span class="k">现象</span><span>rosrun graduation_control.py 后按 Ctrl+C 不退出。</span><span class="k">根因</span><span>关闭回调里用 rospy.sleep 等待，仿真时钟停止后永远等不到。</span>
+<span class="k">修改</span><span><div>· 关闭时改用 time.sleep 发送几次零速度。</div></span><span class="k">结果</span><span class="sec">模拟 Ctrl+C 后 1 s 内正常退出。</span></div></div></div><div class="tl"><div class="rail"><div class="dot ">E4</div><div class="line"></div></div>
+<div class="content" style=""><div class="row"><b>缺口处提前左拐并压线</b><span class="small muted">已解决</span><span class="pill">graduation_detect.py</span><span class="pill">graduation_control.py</span></div>
+<div class="kv"><span class="k">现象</span><span>到缺口前小车提前左拐压线，期望是补齐缺失的黄线直行，走到尽头再右拐。</span><span class="k">根因</span><span>容忍期原样保持丢线前一帧的转向，一次误检的转向会被持续 1.2 s。</span>
+<span class="k">修改</span><span><div>· 缺口内改为直行，并加转向变化率限制。</div><div>· 随后又把跟踪窗口扩到第 200 行、转向改为近 6 帧平均。</div></span><span class="k">结果</span><span class="sec">问题没有根治，继续扩大检测行范围时引发了下一个问题。</span></div></div></div><div class="tl"><div class="rail"><div class="dot rev">E5</div></div>
+<div class="content" style="padding-bottom:0"><div class="row"><b>一启动就右拐（改错后回退）</b><span class="small muted">已回退</span><span class="pill">graduation_detect.py</span><span class="pill">graduation_control.py</span></div>
+<div class="kv"><span class="k">现象</span><span>把参考行扩到第 200 行后，小车一启动就右拐。</span><span class="k">根因</span><span>远处的行在正常巡线时也参与定位，远处的黄色干扰物被当成黄线，直接带偏了转向。</span>
+<span class="k">修改</span><span><div>· 按要求把两份代码回退到“缺口处卡住”之前的状态。</div></span><span class="k">结果</span><span class="sec">教训：远处行只能作兜底，不能和近处行同等使用（后来的 270/260/250 兜底行就是这样做的）。</span></div></div></div></div></section>
+<hr>
+<section><h2>修复效果</h2>
+<div class="grid g2">
+<div><h3>顶部凸起：左侧最小净距</h3><svg viewBox="0 0 460 220" width="100%" style="max-width:460px;display:block"><line x1="44" x2="448" y1="174.0" y2="174.0" style="stroke:var(--line2)"/><text x="38" y="178.0" font-size="10" text-anchor="end" style="fill:var(--fg3)">0</text><line x1="44" x2="448" y1="134.5" y2="134.5" style="stroke:var(--line2)"/><text x="38" y="138.5" font-size="10" text-anchor="end" style="fill:var(--fg3)">6</text><line x1="44" x2="448" y1="95.0" y2="95.0" style="stroke:var(--line2)"/><text x="38" y="99.0" font-size="10" text-anchor="end" style="fill:var(--fg3)">11</text><line x1="44" x2="448" y1="55.5" y2="55.5" style="stroke:var(--line2)"/><text x="38" y="59.5" font-size="10" text-anchor="end" style="fill:var(--fg3)">17</text><line x1="44" x2="448" y1="16.0" y2="16.0" style="stroke:var(--line2)"/><text x="38" y="20.0" font-size="10" text-anchor="end" style="fill:var(--fg3)">23</text><rect x="76.3" y="174.0" width="70.0" height="0.5" rx="3" style="fill:var(--green)"/><text x="111.3" y="169.0" font-size="11" text-anchor="middle" style="fill:var(--fg)">0 cm</text><text x="111.3" y="190.0" font-size="11" text-anchor="middle" style="fill:var(--fg2)">修复前</text><rect x="211.0" y="143.5" width="70.0" height="30.5" rx="3" style="fill:var(--green)"/><text x="246.0" y="138.5" font-size="11" text-anchor="middle" style="fill:var(--fg)">4.4 cm</text><text x="246.0" y="190.0" font-size="11" text-anchor="middle" style="fill:var(--fg2)">左侧保护</text><rect x="345.7" y="42.3" width="70.0" height="131.7" rx="3" style="fill:var(--green)"/><text x="380.7" y="37.3" font-size="11" text-anchor="middle" style="fill:var(--fg)">19 cm</text><text x="380.7" y="190.0" font-size="11" text-anchor="middle" style="fill:var(--fg2)">双侧保护 + target_x 115</text><line x1="44" x2="448" y1="70.1" y2="70.1" stroke-dasharray="5 4" style="stroke:var(--orange)"/><text x="446" y="65.1" font-size="10.5" text-anchor="end" style="fill:var(--orange)">目标 ≥ 15 cm</text><text x="12" y="95.0" font-size="10.5" text-anchor="middle" transform="rotate(-90 12 95.0)" style="fill:var(--fg3)">cm</text></svg><p class="small muted">纵轴：车轮外沿到左侧黄线中心 (cm)。来源：各阶段整圈测试中凸起段的最小值。</p></div>
+<div><h3>右下角：右侧最小净距</h3><svg viewBox="0 0 460 220" width="100%" style="max-width:460px;display:block"><line x1="44" x2="448" y1="174.0" y2="174.0" style="stroke:var(--line2)"/><text x="38" y="178.0" font-size="10" text-anchor="end" style="fill:var(--fg3)">0</text><line x1="44" x2="448" y1="134.5" y2="134.5" style="stroke:var(--line2)"/><text x="38" y="138.5" font-size="10" text-anchor="end" style="fill:var(--fg3)">4</text><line x1="44" x2="448" y1="95.0" y2="95.0" style="stroke:var(--line2)"/><text x="38" y="99.0" font-size="10" text-anchor="end" style="fill:var(--fg3)">8</text><line x1="44" x2="448" y1="55.5" y2="55.5" style="stroke:var(--line2)"/><text x="38" y="59.5" font-size="10" text-anchor="end" style="fill:var(--fg3)">13</text><line x1="44" x2="448" y1="16.0" y2="16.0" style="stroke:var(--line2)"/><text x="38" y="20.0" font-size="10" text-anchor="end" style="fill:var(--fg3)">17</text><rect x="110.0" y="132.6" width="70.0" height="41.4" rx="3" style="fill:var(--green)"/><text x="145.0" y="127.6" font-size="11" text-anchor="middle" style="fill:var(--fg)">4.4 cm</text><text x="145.0" y="190.0" font-size="11" text-anchor="middle" style="fill:var(--fg2)">修复前</text><rect x="312.0" y="42.3" width="70.0" height="131.7" rx="3" style="fill:var(--green)"/><text x="347.0" y="37.3" font-size="11" text-anchor="middle" style="fill:var(--fg)">14 cm</text><text x="347.0" y="190.0" font-size="11" text-anchor="middle" style="fill:var(--fg2)">双侧保护</text><text x="12" y="95.0" font-size="10.5" text-anchor="middle" transform="rotate(-90 12 95.0)" style="fill:var(--fg3)">cm</text></svg><p class="small muted">纵轴：车轮外沿到右侧黄线中心 (cm)。来源：修复前后整圈测试中右下角的最小值。</p></div>
+</div>
+<h3 style="margin-top:16px">缺口直行测试（问题 6 修复后）</h3>
+<div class="tablewrap"><table><thead><tr><th>缺口</th><th>直行帧数</th><th>航向变化 (rad)</th><th>横向漂移</th></tr></thead><tbody><tr><td>左上角缺口</td><td>43</td><td>1.569 → 1.586</td><td>约 1 cm</td></tr><tr><td>底部中间缺口</td><td>42</td><td>-3.090 → -3.112</td><td>约 2.5 cm</td></tr></tbody></table></div>
+</section>
+<section><h2>关键参数演变</h2>
+<div class="tablewrap"><table><thead><tr><th>参数</th><th>所在节点</th><th>演变</th><th>为什么改</th></tr></thead><tbody><tr><td><code>target_x</code></td><td>控制</td><td>135（比赛经验值）→ 140 → 115</td><td>离左线更远，与 side_margin 匹配</td></tr><tr><td><code>gap_hold_frames</code></td><td>控制</td><td>无 → 10 → 60</td><td>缺口从外弯到重新看到黄线约 43 帧</td></tr><tr><td>丢线后行为</td><td>控制</td><td>停车 → 原地转 → 前进 + 右转 -0.38</td><td>阿克曼底盘停车无法转向</td></tr><tr><td><code>line_end_row</code></td><td>控制</td><td>新增 298</td><td>提前识别缺口，不跟随末端外弯</td></tr><tr><td><code>side_margin</code></td><td>控制</td><td>新增 0.15 → 0.25 m</td><td>凸起处离左线更远</td></tr><tr><td><code>right_margin</code></td><td>控制</td><td>新增 0.15 m</td><td>右转弯不切到内侧线端</td></tr><tr><td><code>turn_rate_limit</code></td><td>控制</td><td>新增 0.4 rad/s</td><td>预测按底盘实际转速，消除弯后左右摆</td></tr><tr><td><code>max_lost_tolerance</code></td><td>检测</td><td>5 → 60</td><td>过缺口期间不改锁右侧道路线</td></tr><tr><td><code>target_rows</code></td><td>检测</td><td>10 行 → 13 行（加 270/260/250）</td><td>左拐晚转时用远处行继续转向</td></tr><tr><td>跟踪参考点</td><td>检测</td><td>上一帧位置 → 位置 + 平滑速度</td><td>急弯跟得上，缺口附近不误锁</td></tr></tbody></table></div>
+</section>
+<section><h2>经验与注意事项</h2>
+<div class="grid g2" style="gap:12px">
+<div class="callout warning"><div class="t">私有参数会一直留在参数服务器上</div><div class="small">用 <code>rosrun ... _target_x:=110</code> 传的参数，下次不带也会继续生效，曾导致误判测试结果。测试前先执行 <code>rosparam delete /graduation_control</code> 和 <code>/graduation_lane_detector</code>。</div></div>
+<div class="callout warning"><div class="t">改完代码必须重启节点</div><div class="small">已在运行的 Python 进程仍然使用旧代码。多次出现旧进程残留在后台、和新进程同时发布指令的情况。</div></div>
+<div class="callout danger"><div class="t">不要删除 / 重新生成 Gazebo 模型</div><div class="small"><code>/gazebo/delete_model</code> 会让 gzserver 崩溃；复位小车用 <code>/gazebo/set_model_state</code>。</div></div>
+<div class="callout info"><div class="t">按模式结束进程要小心</div><div class="small"><code>pkill -f</code> 的模式可能匹配到执行命令的 shell 本身；用 <code>[d]bg</code> 这类写法或按 PID 结束。</div></div>
+</div>
+<div style="margin-top:12px"><details><summary>调参上的教训</summary><div class="body"><p class="small">· 参数调不好时先找物理原因：压线的根源是相机盲区和阿克曼转向慢，不是检测精度。</p><p class="small">· target_x 和 side_margin 必须一起调：保护要求的净距大于目标位置对应的净距时，保护会一直拦住转向，黄线移出画面。</p><p class="small">· 远处的图像行只能作兜底：直接参与正常定位会被远处干扰物带偏（更早对话的问题 E5）。</p><p class="small">· 验证要跑整圈并记录最小净距，只看单个弯道容易顾此失彼。</p></div></details></div>
+</section>
+
+<div class="footer">Limo 纯视觉巡线项目文档 · 对应 src/limo_visions/scripts 中的 graduation_detect.py（389 行）与 graduation_control.py（341 行）</div>
+</main>
+
+</body>
+</html>

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>graduation_control.py 结构与流程</title>
+<style>
+:root{--bg:#ffffff;--fg:#1f2328;--fg2:#57606a;--fg3:#8c959f;--fg4:#b1b8c0;--line:#d0d7de;--line2:#e7eaee;
+--fill:#f6f8fa;--fill2:#eceff3;--elev:#ffffff;--accent:#2f6fdb;--yellow:#d9a400;--teal:#1f9a8a;
+--orange:#e08a1e;--red:#c04848;--pink:#c85898;--green:#1f8a65;--info-bg:#eef4fd;--warn-bg:#fdf6e7;--danger-bg:#fcefef;--ok-bg:#ecf7f2}
+@media (prefers-color-scheme: dark){:root{--bg:#181a1f;--fg:#e6e6e6;--fg2:#a9adb4;--fg3:#7d828a;--fg4:#5a5f66;
+--line:#3a3e45;--line2:#2c3036;--fill:#22252b;--fill2:#2a2e35;--elev:#1f2227;--accent:#5b9cf5;--yellow:#e8c030;
+--teal:#2fb3a1;--orange:#f0a040;--red:#e06a6a;--pink:#e08ab8;--green:#3fbf8f;--info-bg:#1d2a3d;--warn-bg:#352d1a;
+--danger-bg:#3a2222;--ok-bg:#1c3129}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif}
+main{max-width:1180px;margin:0 auto;padding:28px 28px 60px}
+h1{font-size:24px;margin:0 0 6px}
+h2{font-size:18px;margin:0 0 10px}
+h3{font-size:15px;margin:0 0 8px}
+p{margin:0 0 8px}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.9em;background:var(--fill2);padding:1px 5px;border-radius:4px}
+pre{margin:0;padding:10px 12px;background:var(--fill);border:1px solid var(--line2);border-radius:6px;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow-x:auto;color:var(--fg)}
+.sub{color:var(--fg2)}.small{font-size:12.5px}.muted{color:var(--fg3)}.sec{color:var(--fg2)}
+.stack>*+*{margin-top:10px}
+.steps p{margin:0 0 6px}
+section{margin-top:30px}
+hr{border:0;border-top:1px solid var(--line2);margin:30px 0 0}
+.grid{display:grid;gap:22px;align-items:start}
+.g2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:860px){.g2,.g3{grid-template-columns:minmax(0,1fr)}}
+.stats{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0}
+.stat{border:1px solid var(--line2);border-radius:8px;padding:10px 14px;min-width:130px}
+.stat b{display:block;font-size:20px;font-weight:600}
+.stat span{font-size:12px;color:var(--fg2)}
+.stat.ok b{color:var(--green)}.stat.info b{color:var(--accent)}.stat.warn b{color:var(--orange)}
+table{border-collapse:collapse;width:100%;font-size:13px;border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+th{text-align:left;font-weight:600;color:var(--fg2);background:var(--fill);border-bottom:1px solid var(--line2);padding:7px 10px;white-space:nowrap}
+td{border-top:1px solid var(--line2);padding:7px 10px;vertical-align:top}
+tr.hl td:first-child::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-right:6px;vertical-align:middle}
+.tablewrap{overflow-x:auto}
+.pill{display:inline-block;font-size:11.5px;border:1px solid var(--line);border-radius:999px;padding:0 8px;color:var(--fg2);margin-right:4px;white-space:nowrap}
+button.pill{background:none;cursor:pointer;font:inherit;font-size:12px;padding:2px 10px}
+button.pill.active{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.callout{border-radius:8px;padding:10px 14px;border:1px solid var(--line2)}
+.callout .t{font-weight:600;margin-bottom:4px}
+.callout.info{background:var(--info-bg)}.callout.warning{background:var(--warn-bg)}.callout.danger{background:var(--danger-bg)}.callout.neutral{background:var(--fill)}
+details{border-top:1px solid var(--line2);padding:8px 0}
+details:last-of-type{border-bottom:1px solid var(--line2)}
+summary{cursor:pointer;font-weight:600;list-style:none;display:flex;align-items:center;gap:8px}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"\25B8";color:var(--fg3);font-size:12px;transition:transform .15s}
+details[open]>summary::before{transform:rotate(90deg)}
+details>.body{padding:10px 0 4px 20px}
+.tl{display:grid;grid-template-columns:34px 1fr;column-gap:12px}
+.tl .rail{display:flex;flex-direction:column;align-items:center}
+.tl .dot{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--accent);color:var(--accent);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.tl .dot.rev{border-color:var(--red);color:var(--red)}.tl .dot.other{border-color:var(--fg3);color:var(--fg3)}
+.tl .line{width:1px;flex:1;background:var(--line);min-height:14px}
+.tl .content{padding-bottom:22px}
+.kv{display:grid;grid-template-columns:52px 1fr;gap:4px 10px;font-size:12.5px;margin-top:6px}
+.kv .k{color:var(--fg3)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.footer{margin-top:40px;color:var(--fg3);font-size:12px;border-top:1px solid var(--line2);padding-top:10px}
+svg text{font-family:inherit}
+</style>
+</head>
+<body>
+<main>
+
+<h1>graduation_control.py 结构与流程</h1>
+<p class="sub">巡线控制节点 <code>graduation_control</code>：根据检测结果控制阿克曼小车沿左侧黄线行驶。每帧先按黄线状态选出基础转向（PD / 缺口直行 / 丢线搜索），再经过盲区防压线保护修正，限幅后发布到 <code>/cmd_vel</code>。</p>
+<div class="stats"><div class="stat "><b>341</b><span>代码行数</span></div><div class="stat "><b>0.19 m/s</b><span>巡航速度（恒定）</span></div><div class="stat "><b>3 → 1</b><span>订阅 / 发布话题</span></div><div class="stat "><b>0.4 s</b><span>看门狗超时</span></div></div>
+
+<div class="grid g2" style="margin-top:20px">
+<div class="stack"><h2>每帧决策流程（pose_callback）</h2><svg viewBox="0 0 598 714" width="100%" style="max-width:598px;display:block"><defs><marker id="ar-c1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--fg3)"/></marker></defs><path d="M224.0 50.0C224.0 70.0,224.0 70.0,224.0 90.0" fill="none" stroke-width="1.2" marker-end="url(#ar-c1)" style="stroke:var(--fg4)"/><path d="M224.0 132.0C224.0 152.0,74.0 152.0,74.0 172.0" fill="none" stroke-width="1.2" marker-end="url(#ar-c1)" style="stroke:var(--fg4)"/><rect x="139.0" y="144.0" width="20" height="15" rx="3" style="fill:var(--bg)"/><text x="149.0" y="155.0" font-size="10.5" text-anchor="middle" style="fill:var(--fg2)">否</text><path d="M224.0 132.0C224.0 152.0,224.0 152.0,224.0 172.0" fill="none" stroke-width="1.2" marker-end="url(#ar-c1)" style="stroke:var(--fg4)"/><rect x="214.0" y="144.0" width="20" height="15" rx="3" style="fill:var(--bg)"/><text x="224.0" y="155.0" font-size="10.5" text-anchor="middle" style="fill:var(--fg2)">是</text><path d="M224.0 214.0C224.0 234.0,224.0 234.0,224.0 254.0" fill="none" stroke-width="1.2" marker-end="url(#ar-c1)" style="stroke:var(--fg4)"/><path d="M224.0 296.0C224.0 398.0,74.0 398.0,74.0 500.0" fill="none" stroke-width="1.2" marker-end="url(#ar-c1)" style="stroke:var(--fg4)"/><rect x="139.0" y="390.0" width="20" height="15" rx="3" style="fill:var(--bg)"/><text x="149.0" y="401.0" font-size="10.5" text-anchor="middle" style="fill:var(--fg2)">否</text><path d="M224.0 296.0C224.0 316.0,374.0 316.0,374.0 336.0" fill="none" stroke-width="1.2" marker-end="url(#ar-c1)" style="stroke:var(--fg4)"/><rect x="289.0" y="308.0" width="20" height="15" rx="3" style="fill:var(--bg)"/><text x="299.0" y="319.0" font-size="10.5" text-anchor="middle" style="fill:var(--fg2)">是</text><path d="M374.0 378.0C374.0 439.0,224.0 439.0,224.0 500.0" fill="none" stroke-width="1.2" marker-end="url(#ar-c1)" style="stroke:var(--fg4)"/><rect x="289.0" y="431.0" width="20" height="15" rx="3" style="fill:var(--bg)"/><text x="299.0" y="442.0" font-size="10.5" text-anchor="middle" style="fill:var(--fg2)">是</text><path d="M374.0 378.0C374.0 398.0,524.0 398.0,524.0 418.0" fill="none" stroke-width="1.2" marker-end="url(#ar-c1)" style="stroke:var(--fg4)"/><rect x="439.0" y="390.0" width="20" height="15" rx="3" style="fill:var(--bg)"/><text x="449.0" y="401.0" font-size="10.5" text-anchor="middle" style="fill:var(--fg2)">否</text><path d="M524.0 460.0C524.0 480.0,374.0 480.0,374.0 500.0" fill="none" stroke-width="1.2" marker-end="url(#ar-c1)" style="stroke:var(--fg4)"/><rect x="439.0" y="472.0" width="20" height="15" rx="3" style="fill:var(--bg)"/><text x="449.0" y="483.0" font-size="10.5" text-anchor="middle" style="fill:var(--fg2)">是</text><path d="M524.0 460.0C524.0 480.0,524.0 480.0,524.0 500.0" fill="none" stroke-width="1.2" marker-end="url(#ar-c1)" style="stroke:var(--fg4)"/><rect x="514.0" y="472.0" width="20" height="15" rx="3" style="fill:var(--bg)"/><text x="524.0" y="483.0" font-size="10.5" text-anchor="middle" style="fill:var(--fg2)">否</text><path d="M74.0 542.0C74.0 562.0,299.0 562.0,299.0 582.0" fill="none" stroke-width="1.2" marker-end="url(#ar-c1)" style="stroke:var(--fg4)"/><path d="M224.0 542.0C224.0 562.0,299.0 562.0,299.0 582.0" fill="none" stroke-width="1.2" marker-end="url(#ar-c1)" style="stroke:var(--fg4)"/><path d="M374.0 542.0C374.0 562.0,299.0 562.0,299.0 582.0" fill="none" stroke-width="1.2" marker-end="url(#ar-c1)" style="stroke:var(--fg4)"/><path d="M524.0 542.0C524.0 562.0,299.0 562.0,299.0 582.0" fill="none" stroke-width="1.2" marker-end="url(#ar-c1)" style="stroke:var(--fg4)"/><path d="M299.0 624.0C299.0 644.0,299.0 644.0,299.0 664.0" fill="none" stroke-width="1.2" marker-end="url(#ar-c1)" style="stroke:var(--fg4)"/><rect x="158.0" y="8.0" width="132" height="42" rx="21.0" style="fill:var(--elev);stroke:var(--accent)"/><text x="224.0" y="26.0" font-size="11.5" font-weight="600" text-anchor="middle" style="fill:var(--fg)">收到 Pose</text><text x="224.0" y="41.0" font-size="10" text-anchor="middle" style="fill:var(--fg2)">/lane_detect_pose</text><polygon points="224.0,90 290,111.0 224.0,132 158,111.0" style="fill:var(--fill2);stroke:var(--line)"/><text x="224.0" y="115.0" font-size="11.5" font-weight="600" text-anchor="middle" style="fill:var(--fg)">已找到过黄线？</text><rect x="8.0" y="172.0" width="132" height="42" rx="6" style="fill:var(--elev);stroke:var(--line)"/><text x="74.0" y="190.0" font-size="11.5" font-weight="600" text-anchor="middle" style="fill:var(--fg)">发布零速度</text><text x="74.0" y="205.0" font-size="10" text-anchor="middle" style="fill:var(--fg2)">x ≥ 0 前保持静止</text><rect x="158.0" y="172.0" width="132" height="42" rx="6" style="fill:var(--elev);stroke:var(--line)"/><text x="224.0" y="190.0" font-size="11.5" font-weight="600" text-anchor="middle" style="fill:var(--fg)">_update_line_state</text><text x="224.0" y="205.0" font-size="10" text-anchor="middle" style="fill:var(--fg2)">丢线判断 / 计数</text><polygon points="224.0,254 290,275.0 224.0,296 158,275.0" style="fill:var(--fill2);stroke:var(--line)"/><text x="224.0" y="279.0" font-size="11.5" font-weight="600" text-anchor="middle" style="fill:var(--fg)">line_missing？</text><rect x="8.0" y="500.0" width="132" height="42" rx="6" style="fill:var(--elev);stroke:var(--line)"/><text x="74.0" y="518.0" font-size="11.5" font-weight="600" text-anchor="middle" style="fill:var(--fg)">PD 控制</text><text x="74.0" y="533.0" font-size="10" text-anchor="middle" style="fill:var(--fg2)">0.007 × (115 − x)</text><polygon points="374.0,336 440,357.0 374.0,378 308,357.0" style="fill:var(--fill2);stroke:var(--line)"/><text x="374.0" y="361.0" font-size="11.5" font-weight="600" text-anchor="middle" style="fill:var(--fg)">丢线 ≤ 60 帧？</text><rect x="158.0" y="500.0" width="132" height="42" rx="6" style="fill:var(--elev);stroke:var(--line)"/><text x="224.0" y="518.0" font-size="11.5" font-weight="600" text-anchor="middle" style="fill:var(--fg)">缺口直行</text><text x="224.0" y="533.0" font-size="10" text-anchor="middle" style="fill:var(--fg2)">ang = 0</text><polygon points="524.0,418 590,439.0 524.0,460 458,439.0" style="fill:var(--fill2);stroke:var(--line)"/><text x="524.0" y="443.0" font-size="11.5" font-weight="600" text-anchor="middle" style="fill:var(--fg)">y ≤ 340？</text><rect x="308.0" y="500.0" width="132" height="42" rx="6" style="fill:var(--elev);stroke:var(--line)"/><text x="374.0" y="518.0" font-size="11.5" font-weight="600" text-anchor="middle" style="fill:var(--fg)">右转搜索</text><text x="374.0" y="533.0" font-size="10" text-anchor="middle" style="fill:var(--fg2)">ang = −0.38</text><rect x="458.0" y="500.0" width="132" height="42" rx="6" style="fill:var(--elev);stroke:var(--line)"/><text x="524.0" y="518.0" font-size="11.5" font-weight="600" text-anchor="middle" style="fill:var(--fg)">直行</text><text x="524.0" y="533.0" font-size="10" text-anchor="middle" style="fill:var(--fg2)">ang = 0</text><rect x="233.0" y="582.0" width="132" height="42" rx="6" style="fill:var(--elev);stroke:var(--line)"/><text x="299.0" y="600.0" font-size="11.5" font-weight="600" text-anchor="middle" style="fill:var(--fg)">_limit_turn</text><text x="299.0" y="615.0" font-size="10" text-anchor="middle" style="fill:var(--fg2)">防压线修正</text><rect x="233.0" y="664.0" width="132" height="42" rx="6" style="fill:var(--fill2);stroke:var(--accent)"/><text x="299.0" y="682.0" font-size="11.5" font-weight="600" text-anchor="middle" style="fill:var(--fg)">_publish</text><text x="299.0" y="697.0" font-size="10" text-anchor="middle" style="fill:var(--fg2)">lin 0.19，ang 限幅</text></svg>
+<p class="small muted">线速度在所有分支都是 cruise_speed，只有角速度不同。</p></div>
+<div class="stack"><h2>数据流</h2><svg viewBox="0 0 502 386" width="100%" style="max-width:502px;display:block"><defs><marker id="ar-c2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--fg3)"/></marker></defs><path d="M83.0 50.0C83.0 70.0,83.0 70.0,83.0 90.0" fill="none" stroke-width="1.2" marker-end="url(#ar-c2)" style="stroke:var(--fg4)"/><path d="M251.0 50.0C251.0 70.0,251.0 70.0,251.0 90.0" fill="none" stroke-width="1.2" marker-end="url(#ar-c2)" style="stroke:var(--fg4)"/><path d="M419.0 50.0C419.0 70.0,419.0 70.0,419.0 90.0" fill="none" stroke-width="1.2" marker-end="url(#ar-c2)" style="stroke:var(--fg4)"/><path d="M83.0 132.0C83.0 152.0,167.0 152.0,167.0 172.0" fill="none" stroke-width="1.2" marker-end="url(#ar-c2)" style="stroke:var(--fg4)"/><path d="M251.0 132.0C251.0 152.0,335.0 152.0,335.0 172.0" fill="none" stroke-width="1.2" marker-end="url(#ar-c2)" style="stroke:var(--fg4)"/><path d="M419.0 132.0C419.0 193.0,251.0 193.0,251.0 254.0" fill="none" stroke-width="1.2" marker-end="url(#ar-c2)" style="stroke:var(--fg4)"/><path d="M167.0 214.0C167.0 234.0,251.0 234.0,251.0 254.0" fill="none" stroke-width="1.2" marker-end="url(#ar-c2)" style="stroke:var(--fg4)"/><path d="M335.0 214.0C335.0 234.0,251.0 234.0,251.0 254.0" fill="none" stroke-width="1.2" marker-end="url(#ar-c2)" style="stroke:var(--fg4)"/><path d="M251.0 296.0C251.0 316.0,251.0 316.0,251.0 336.0" fill="none" stroke-width="1.2" marker-end="url(#ar-c2)" style="stroke:var(--fg4)"/><rect x="8.0" y="8.0" width="150" height="42" rx="21.0" style="fill:var(--elev);stroke:var(--accent)"/><text x="83.0" y="26.0" font-size="11.5" font-weight="600" text-anchor="middle" style="fill:var(--fg)">/lane_detect_pose</text><text x="83.0" y="41.0" font-size="10" text-anchor="middle" style="fill:var(--fg2)">检测结果</text><rect x="176.0" y="8.0" width="150" height="42" rx="21.0" style="fill:var(--elev);stroke:var(--accent)"/><text x="251.0" y="26.0" font-size="11.5" font-weight="600" text-anchor="middle" style="fill:var(--fg)">right_points</text><text x="251.0" y="41.0" font-size="10" text-anchor="middle" style="fill:var(--fg2)">/lane_detect_right_points</text><rect x="344.0" y="8.0" width="150" height="42" rx="21.0" style="fill:var(--elev);stroke:var(--accent)"/><text x="419.0" y="26.0" font-size="11.5" font-weight="600" text-anchor="middle" style="fill:var(--fg)">/odom</text><text x="419.0" y="41.0" font-size="10" text-anchor="middle" style="fill:var(--fg2)">里程计位姿</text><rect x="8.0" y="90.0" width="150" height="42" rx="6" style="fill:var(--elev);stroke:var(--line)"/><text x="83.0" y="108.0" font-size="11.5" font-weight="600" text-anchor="middle" style="fill:var(--fg)">pose_callback</text><text x="83.0" y="123.0" font-size="10" text-anchor="middle" style="fill:var(--fg2)">巡线决策</text><rect x="176.0" y="90.0" width="150" height="42" rx="6" style="fill:var(--elev);stroke:var(--line)"/><text x="251.0" y="108.0" font-size="11.5" font-weight="600" text-anchor="middle" style="fill:var(--fg)">right_callback</text><text x="251.0" y="123.0" font-size="10" text-anchor="middle" style="fill:var(--fg2)">换算到里程计坐标</text><rect x="344.0" y="90.0" width="150" height="42" rx="6" style="fill:var(--elev);stroke:var(--line)"/><text x="419.0" y="108.0" font-size="11.5" font-weight="600" text-anchor="middle" style="fill:var(--fg)">odom_callback</text><text x="419.0" y="123.0" font-size="10" text-anchor="middle" style="fill:var(--fg2)">odom_pose (x, y, yaw)</text><rect x="92.0" y="172.0" width="150" height="42" rx="6" style="fill:var(--elev);stroke:var(--line)"/><text x="167.0" y="190.0" font-size="11.5" font-weight="600" text-anchor="middle" style="fill:var(--fg)">line_memory</text><text x="167.0" y="205.0" font-size="10" text-anchor="middle" style="fill:var(--fg2)">左侧黄线点 ×120</text><rect x="260.0" y="172.0" width="150" height="42" rx="6" style="fill:var(--elev);stroke:var(--line)"/><text x="335.0" y="190.0" font-size="11.5" font-weight="600" text-anchor="middle" style="fill:var(--fg)">right_memory</text><text x="335.0" y="205.0" font-size="10" text-anchor="middle" style="fill:var(--fg2)">右侧黄线点 ×300</text><rect x="176.0" y="254.0" width="150" height="42" rx="6" style="fill:var(--elev);stroke:var(--line)"/><text x="251.0" y="272.0" font-size="11.5" font-weight="600" text-anchor="middle" style="fill:var(--fg)">_limit_turn</text><text x="251.0" y="287.0" font-size="10" text-anchor="middle" style="fill:var(--fg2)">盲区防压线保护</text><rect x="176.0" y="336.0" width="150" height="42" rx="6" style="fill:var(--fill2);stroke:var(--accent)"/><text x="251.0" y="354.0" font-size="11.5" font-weight="600" text-anchor="middle" style="fill:var(--fg)">_publish → /cmd_vel</text><text x="251.0" y="369.0" font-size="10" text-anchor="middle" style="fill:var(--fg2)">限幅 ±0.8 后发布</text></svg>
+<p class="small sec">只有看到黄线（x ≥ 0）且已有里程计时，才把目标点记入 line_memory。右侧点在 right_callback 中加锁写入，_limit_turn 读取时也加锁复制。</p>
+<h3>类结构</h3><div class="tablewrap"><table><thead><tr><th>方法</th><th>作用</th></tr></thead><tbody><tr><td><code>_init_tracking_params</code></td><td>巡航速度、target_x、kp / kd、限幅、看门狗超时</td></tr><tr><td><code>_init_gap_params</code></td><td>丢线阈值、缺口判断行、直行帧数、搜索角速度</td></tr><tr><td><code>_init_guard_params</code></td><td>防压线净距、预测时长、检查范围、车辆几何</td></tr><tr><td><code>pose_callback</code></td><td>一帧决策：状态 → 基础转向 → 保护 → 发布 → 日志</td></tr><tr><td><code>_update_line_state</code></td><td>判断丢线（含快到缺口），更新连续丢线帧数</td></tr><tr><td><code>_base_turn</code></td><td>三分支选出保护前的角速度</td></tr><tr><td><code>_limit_turn</code></td><td>在期望值附近搜索两侧都不贴线的角速度</td></tr><tr><td><code>_predicted_clearance</code></td><td>沿候选角速度积分 1.5 s，求途中两侧最小净距</td></tr><tr><td><code>_clearance</code></td><td>某位姿下车身一侧到记忆黄线的最小净距</td></tr><tr><td><code>_remember</code></td><td>base_link 地面点 → 里程计坐标，存入记忆</td></tr><tr><td><code>watchdog / clean_shutdown</code></td><td>超时停车 / 退出时发零速</td></tr></tbody></table></div></div>
+</div>
+<hr>
+<section><h2>巡线决策详解</h2>
+<div class="grid g2">
+<div class="stack"><h3>_update_line_state：丢线判断</h3>
+<pre>line_ending  = far_row &gt;= 298 and 0 &lt;= x &lt;= 115
+line_missing = z &lt;= 5 or x &lt; 0 or line_ending
+just_recovered = not line_missing and prev_line_missing
+lost_frame_count = lost_frame_count + 1 if line_missing else 0</pre>
+<p class="small"><b>快到缺口（line_ending）：</b>缺口前黄线末端向左外弯，跟踪到的最远端行号变大（正常约 241，缺口前约 300），列坐标落在目标列左侧。此时不再跟随列坐标，否则车会斜着冲过缺口并压线。</p>
+<p class="small">右转弯时最远端行号同样会变大（约 280–301），但列坐标在目标列右侧，所以不会被误判为缺口。</p></div>
+<div class="stack"><h3>_base_turn：三个分支</h3>
+<pre>if line_missing:
+    if lost_frame_count &lt;= 60:
+        return 0.0                 # 缺口直行
+    return -0.38 if y &lt;= 340 else 0.0   # 搜索
+error = 115 - x
+derivative = 0 if just_recovered else error - prev_error
+prev_error = error
+return 0.007 * error + 0.0 * derivative</pre>
+<div class="tablewrap"><table><thead><tr><th>分支</th><th>条件</th><th>角速度</th><th>原因</th></tr></thead><tbody><tr><td>PD 巡线</td><td>看到黄线</td><td>kp·误差 + kd·变化</td><td>黄线保持在第 115 列</td></tr><tr><td>缺口直行</td><td>丢线 ≤ 60 帧</td><td>0</td><td>按缺口前车头方向开过缺口（约 43 帧）</td></tr><tr><td>右转搜索</td><td>丢线 &gt; 60 帧，y ≤ 340</td><td>−0.38</td><td>顺时针赛道缺口后向右；停车无法转向</td></tr><tr><td>直行</td><td>丢线 &gt; 60 帧，y &gt; 340</td><td>0</td><td>车身正对黄线</td></tr></tbody></table></div></div>
+</div></section>
+<section><h2>盲区防压线保护</h2>
+<div class="callout info"><div class="t">为什么需要</div><div class="small">相机最近只能看到车前约 0.95 m。按目标列转向相当于瞄着前方约 1 m 的点，弯道处会提前转向切弯：左拐时左侧车身压到左线拐角（顶部凸起），右拐时右侧车身扫到内侧线端（右下角）。仅调 target_x 或延迟转向都无法解决。</div></div>
+<div class="grid" style="grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);margin-top:14px"><svg viewBox="0 0 560 372" width="100%" style="max-width:560px;display:block"><rect x="72.0" y="60.0" width="195.0" height="260.0" stroke-dasharray="4 3" style="fill:var(--fill);stroke:var(--line)"/><text x="76.0" y="54.0" font-size="10" style="fill:var(--fg3)">检查窗口：base_link 后 0.30 m ～ 前 0.45 m</text><polyline points="59.0,73.0 85.0,73.0 111.0,73.0 137.0,73.0 163.0,73.0 189.0,73.0 215.0,73.0 241.0,73.0 267.0,83.3 293.0,100.5 319.0,109.0 345.0,106.1 371.0,92.7 397.0,73.0 423.0,73.0 449.0,73.0" fill="none" stroke-width="3" opacity=".35" style="stroke:var(--yellow)"/><circle cx="59.0" cy="73.0" r="3" style="fill:var(--yellow)"/><circle cx="85.0" cy="73.0" r="3" style="fill:var(--yellow)"/><circle cx="111.0" cy="73.0" r="3" style="fill:var(--yellow)"/><circle cx="137.0" cy="73.0" r="3" style="fill:var(--yellow)"/><circle cx="163.0" cy="73.0" r="3" style="fill:var(--yellow)"/><circle cx="189.0" cy="73.0" r="3" style="fill:var(--yellow)"/><circle cx="215.0" cy="73.0" r="3" style="fill:var(--yellow)"/><circle cx="241.0" cy="73.0" r="3" style="fill:var(--yellow)"/><circle cx="267.0" cy="83.3" r="3" style="fill:var(--yellow)"/><circle cx="72.0" cy="294.0" r="3" style="fill:var(--teal)"/><circle cx="98.0" cy="294.0" r="3" style="fill:var(--teal)"/><circle cx="124.0" cy="294.0" r="3" style="fill:var(--teal)"/><circle cx="150.0" cy="294.0" r="3" style="fill:var(--teal)"/><circle cx="176.0" cy="294.0" r="3" style="fill:var(--teal)"/><circle cx="202.0" cy="294.0" r="3" style="fill:var(--teal)"/><circle cx="228.0" cy="294.0" r="3" style="fill:var(--teal)"/><circle cx="254.0" cy="294.0" r="3" style="fill:var(--teal)"/><circle cx="280.0" cy="294.0" r="3" style="fill:var(--teal)"/><rect x="66.8" y="138.0" width="140.39999999999998" height="104.0" rx="5" style="fill:var(--elev);stroke:var(--fg2)"/><circle cx="92.8" cy="190" r="3" style="fill:var(--fg2)"/><text x="92.8" y="204" font-size="9.5" text-anchor="middle" style="fill:var(--fg3)">后轴</text><circle cx="150" cy="190" r="3" style="fill:var(--accent)"/><text x="156" y="204" font-size="9.5" style="fill:var(--fg3)">base_link</text><polyline points="150.0,190.0 154.9,188.4 159.8,186.8 164.6,185.0 169.4,183.1 174.2,181.0 178.9,178.9 183.5,176.6 188.1,174.2 192.6,171.7 197.0,169.1 201.4,166.4 205.7,163.5 210.0,160.6 214.1,157.6 218.2,154.4" fill="none" stroke-width="1.5" stroke-dasharray="5 3" style="stroke:var(--accent)"/><text x="224.2" y="154.4" font-size="10" style="fill:var(--accent)">候选角速度 1.5 s 预测轨迹</text><line x1="176.0" y1="138.0" x2="176.0" y2="73.0" stroke-width="1.5" style="stroke:var(--red)"/><text x="182.0" y="109.5" font-size="10" style="fill:var(--red)">左侧净距</text><text x="410.0" y="76.4" font-size="10" text-anchor="middle" style="fill:var(--fg2)">前方弯道（相机看到时记下）</text><circle cx="20" cy="340" r="4" style="fill:var(--yellow)"/><text x="30" y="344" font-size="10.5" style="fill:var(--fg2)">记忆的左侧黄线点（line_memory, 120 个）</text><circle cx="290" cy="340" r="4" style="fill:var(--teal)"/><text x="300" y="344" font-size="10.5" style="fill:var(--fg2)">记忆的右侧黄线点（right_memory, 300 个）</text><rect x="16" y="354" width="10" height="8" style="fill:var(--elev);stroke:var(--fg2)"/><text x="30" y="362" font-size="10.5" style="fill:var(--fg2)">车身（半宽 0.20 m，前沿 0.22 m）</text></svg>
+<div class="stack">
+<p class="small"><b>1. 记忆：</b>相机看到黄线时，把地面点按当前里程计位姿换算到里程计坐标系存下来；车开进盲区后仍然知道黄线在哪里。</p>
+<p class="small"><b>2. 当前净距：</b><code>_clearance</code> 只看检查窗口内、位于该侧的记忆点，取最小横向距离减去车身半宽 0.20 m。</p>
+<p class="small"><b>3. 预测：</b><code>_predicted_clearance</code> 按候选角速度（截断到 ±0.4）绕后轴积分 15 步 × 0.1 s，记录途中两侧的最小净距。</p>
+<p class="small"><b>4. 选择：</b>要求左侧 ≥ min(0.25, 当前左净距)、右侧 ≥ min(0.15, 当前右净距)，即已经小于要求的一侧只要求不再更近。候选从期望值出发按 0, +0.05, −0.05, +0.10… 由近到远检查，取第一个满足的；都不满足时取总缺口最小的。</p>
+<p class="small sec">效果：拐角处车先直行，让车身越过拐角再转；车头背离黄线的方向不受限制，可以正常回正。</p>
+</div></div>
+<div style="margin-top:12px"><details><summary>_limit_turn 与 _predicted_clearance 代码</summary><div class="body"><div class="grid g2"><pre>req_left  = min(side_margin,  now_left)
+req_right = min(right_margin, now_right)
+ang = clip(ang, -0.8, 0.8)
+for k in range(65):
+    cand = ang + 0.05 * ((k+1)//2) * (1 if k%2 else -1)
+    if cand 超出 ±0.8: continue
+    gl, gr = _predicted_clearance(..., cand)
+    short = shortfall(gl, req_left) + shortfall(gr, req_right)
+    if short == 0: return cand
+    记录 short 最小的 cand
+return best</pre><pre>yaw_rate = clip(ang, -0.4, 0.4)
+rx, ry = base_link 后 0.22 m 的后轴中心
+for _ in range(15):          # 1.5 s / 0.1 s
+    yaw += yaw_rate * 0.1
+    rx  += v * 0.1 * cos(yaw)
+    ry  += v * 0.1 * sin(yaw)
+    px, py = 后轴 + 0.22 * (cos, sin)
+    左/右净距 = _clearance(px, py, yaw)
+    更新两侧最小值</pre></div>
+<p class="small sec" style="margin-top:8px">按后轴积分是因为阿克曼车身绕后轴转动，后轴不会横向甩出；用 0.4 rad/s 上限是因为 0.19 m/s 下底盘实测右转最快约 0.4、左转约 0.25，指令再大也转不动。这两点修正前，保护会高估转向能力，车在弯后左右摆动。</p></div></details></div>
+</section>
+<hr>
+<section><h2>可调参数</h2>
+<p class="small sec">全部可以用 ROS 私有参数覆盖，例如 <code>rosrun limo_visions graduation_control.py _target_x:=120</code>。私有参数会留在参数服务器上，恢复默认前要执行 <code>rosparam delete /graduation_control</code>。各参数所在行号见《巡线参数调整手册》。</p>
+<h3 style="margin-top:12px">巡线与 PD</h3>
+<div class="tablewrap"><table><thead><tr><th>参数</th><th>默认值</th><th>作用 / 调整效果</th></tr></thead><tbody><tr><td><code>cruise_speed</code></td><td>0.19 m/s</td><td>所有分支的线速度；改了要按比例改 gap_hold_frames 并重估 turn_rate_limit</td></tr><tr><td><code>target_x</code></td><td>115 px</td><td>黄线应在的列；车贴左线就调大，偏右就调小。115 ≈ 离线 0.45 m（净距 0.25 m）</td></tr><tr><td><code>kp</code></td><td>0.007</td><td>比例增益；转向迟钝调大，抖动画龙调小</td></tr><tr><td><code>kd</code></td><td>0.0</td><td>微分增益；过弯先冲出去再纠正时从 0.001–0.003 试起，太大放大噪声</td></tr><tr><td><code>max_ang_vel</code></td><td>0.8 rad/s</td><td>角速度指令限幅</td></tr><tr><td><code>message_timeout</code></td><td>0.4 s</td><td>检测消息中断多久看门狗发零速</td></tr></tbody></table></div>
+<h3 style="margin-top:12px">缺口与搜索</h3>
+<div class="tablewrap"><table><thead><tr><th>参数</th><th>默认值</th><th>作用 / 调整效果</th></tr></thead><tbody><tr><td><code>min_line_pixels</code></td><td>5</td><td>跟踪像素数 ≤ 该值视为丢线</td></tr><tr><td><code>line_end_row</code></td><td>298</td><td>最远端行号 ≥ 该值且在目标列左侧 → 缺口直行；调小弯道中误判为缺口，调大会先跟着外弯转一段</td></tr><tr><td><code>gap_hold_frames</code></td><td>60</td><td>缺口直行最多帧数；调小会在缺口中途右转冲进内场</td></tr><tr><td><code>turn_ang_vel</code></td><td>−0.38 rad/s</td><td>搜索角速度；找线太慢调大绝对值，转过头调小</td></tr><tr><td><code>side_hint_threshold</code></td><td>340</td><td>position.y ≤ 该值时转向搜索，否则直行</td></tr></tbody></table></div>
+<h3 style="margin-top:12px">盲区防压线保护</h3>
+<div class="tablewrap"><table><thead><tr><th>参数</th><th>默认值</th><th>作用 / 调整效果</th></tr></thead><tbody><tr><td><code>side_margin</code></td><td>0.25 m</td><td>左轮外沿到左线中心至少保留的距离；调大离左线远但左转更晚，不要大于 target_x 对应的净距</td></tr><tr><td><code>right_margin</code></td><td>0.15 m</td><td>右侧对应值；调大右转更晚更靠外，太大会被逼向左线</td></tr><tr><td><code>side_horizon</code></td><td>1.5 s</td><td>预测时长；调大更早收住转向但更保守，调小拐角处易切进去</td></tr><tr><td><code>side_check_front</code></td><td>0.45 m</td><td>检查窗口前沿；太大会把前方正常弯道当成贴线</td></tr><tr><td><code>turn_rate_limit</code></td><td>0.4 rad/s</td><td>底盘实际最大转速，仅用于预测</td></tr><tr><td><code>body_half_width</code></td><td>0.20 m</td><td>车身中心到车轮外沿（URDF 车轮 ±0.154 m、轮宽 0.099 m）</td></tr><tr><td><code>side_check_rear / rear_axle_offset</code></td><td>−0.30 / 0.22 m</td><td>车辆几何常量，换车才改</td></tr><tr><td><code>side_dt / guard_step</code></td><td>0.1 s / 0.05 rad/s</td><td>预测步长 / 候选角速度步长</td></tr></tbody></table></div>
+<div style="margin-top:12px"><div class="callout warning"><div class="t">target_x 与 side_margin 必须一起调</div><div class="small">side_margin 大于 target_x 对应的直道净距时，保护会一直拦住 PD 的左转，弯道处黄线会从画面左侧移出。实测 target_x = 140 配 0.25 在凸起出口丢线，改为 115 配 0.25 后左侧最小净距约 19 cm。</div></div></div>
+</section>
+<div class="grid g2" style="margin-top:30px">
+<div class="stack"><h2>安全机制</h2><div class="tablewrap"><table><thead><tr><th>机制</th><th>行为</th></tr></thead><tbody><tr><td>启动保护</td><td>第一次检测到黄线（x ≥ 0）前一直发零速</td></tr><tr><td>看门狗</td><td>每 0.1 s 检查一次，超过 0.4 s 没收到检测消息就发零速</td></tr><tr><td>退出</td><td>Ctrl+C 时连续发 5 次零速（time.sleep，仿真时钟停止也能退出）</td></tr><tr><td>不停车搜索</td><td>持续丢线时保持前进，阿克曼底盘停车无法转向</td></tr><tr><td>角速度限幅</td><td>所有指令发布前限制在 ±0.8 rad/s</td></tr></tbody></table></div></div>
+<div class="stack"><h2>运行日志</h2>
+<pre>[巡线] x=121.0 y=340.0 z=2931 far=241 lin=0.19 ang=-0.04 lost=0 L=0.24 R=-</pre>
+<div class="tablewrap"><table><thead><tr><th>字段</th><th>含义</th></tr></thead><tbody><tr><td>x / y / z</td><td>目标列 / 搜索方向辅助量 / 跟踪像素数</td></tr><tr><td>far</td><td>黄线最远端行号（≥ 298 且在目标列左侧 → 缺口）</td></tr><tr><td>lin / ang</td><td>最终发布的线速度 / 角速度（保护修正后）</td></tr><tr><td>lost</td><td>连续丢线帧数（&gt; 60 开始搜索）</td></tr><tr><td>L / R</td><td>当前左 / 右侧净距 (m)，旁边没有记忆点时为 -</td></tr></tbody></table></div>
+<p class="small muted">每秒最多输出一次（loginfo_throttle）。示例行为示意数值。</p></div>
+</div>
+
+<div class="footer">Limo 纯视觉巡线项目文档 · 对应 src/limo_visions/scripts 中的 graduation_detect.py（389 行）与 graduation_control.py（341 行）</div>
+</main>
+
+</body>
+</html>
